@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "824033316260",
+    "project_id": "virtual-dating-189c7",
+    "storage_bucket": "virtual-dating-189c7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:824033316260:android:2fbe016a439e8999ba4531",
+        "android_client_info": {
+          "package_name": "com.example.virtual_dating"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "824033316260-rj2vubt9eb7iii8n38921mqa6nvre23p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.virtual_dating",
+            "certificate_hash": "a3566020d510f4c8c3afb854806df6b1bc14b89e"
+          }
+        },
+        {
+          "client_id": "824033316260-sfsr3h6j8sojkhgmij5r65beh9f3vthd.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAq9J3c7wNbMxApAlay3C2g7Sv_0qsnkLo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "824033316260-sfsr3h6j8sojkhgmij5r65beh9f3vthd.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "824033316260-a47mbgk7ub68gk9jdqq0hahalg55789n.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.virtualDating"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
