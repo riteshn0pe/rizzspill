@@ -54,6 +54,7 @@ class DefaultFirebaseOptions {
     authDomain: 'virtual-dating-189c7.firebaseapp.com',
     storageBucket: 'virtual-dating-189c7.firebasestorage.app',
     measurementId: 'G-EF91KF2H8T',
+    databaseURL: "https://virtual-dating-189c7-default-rtdb.asia-southeast1.firebasedatabase.app"
   );
 
   static const FirebaseOptions android = FirebaseOptions(

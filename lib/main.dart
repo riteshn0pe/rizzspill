@@ -7,6 +7,8 @@ import 'package:virtual_dating/auth/auth_state.dart';
 import 'package:virtual_dating/auth/user_profile_bloc.dart';
 import 'package:virtual_dating/auth/user_profile_event.dart';
 import 'package:virtual_dating/auth_service.dart';
+import 'package:virtual_dating/matching/bloc/match_bloc.dart';
+import 'package:virtual_dating/matching/repository/match_repository.dart';
 import 'package:virtual_dating/matching/screens/finding_match_screen.dart';
 import 'package:virtual_dating/my_home_page.dart';
 import 'package:virtual_dating/pages/login_page.dart';
@@ -106,6 +108,11 @@ class MyApp extends StatelessWidget {
         // B. USER PROFILE BLOC: Handles Database logic
         BlocProvider<UserProfileBloc>(
           create: (context) => UserProfileBloc(userRepository: userRepository),
+        ),
+
+        // C - This is required for the Homepage cards to work!
+        BlocProvider<MatchBloc>(
+          create: (context) => MatchBloc(MatchRepository()),
         ),
       ],
       child: MultiProvider(

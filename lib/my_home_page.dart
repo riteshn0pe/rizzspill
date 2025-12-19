@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:http/http.dart';
+import 'package:virtual_dating/matching/bloc/match_bloc.dart';
+
+import 'matching/bloc/match_event.dart';
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key});
@@ -76,13 +81,27 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                           icon: FontAwesomeIcons.heart,
                           color: Colors.pinkAccent,
                           delay: 0,
+                          roomType: "debate"
                         ),
+
                         _buildCategoryCard(
+                          
+                          title: "Confession",
+                          subtitle: "Free yourself without being exposed",
+                          icon: FontAwesomeIcons.scaleBalanced,
+                          color: const Color.fromARGB(255, 231, 5, 5),
+                          delay: 0.2,
+                          roomType: "confession"
+                        ),
+
+                        _buildCategoryCard(
+                          
                           title: "ELITE DEBATE",
                           subtitle: "Win with logic & pressure",
                           icon: FontAwesomeIcons.scaleBalanced,
                           color: Colors.blueAccent,
                           delay: 0.2,
+                          roomType: "debate"
                         ),
                         _buildCategoryCard(
                           title: "RANDOM VENT",
@@ -90,6 +109,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                           icon: FontAwesomeIcons.ghost,
                           color: Colors.greenAccent,
                           delay: 0.4,
+                          roomType: "random chat"
                         ),
                       ],
                     ),
@@ -140,6 +160,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     required IconData icon,
     required Color color,
     required double delay,
+    required String roomType, // NEW: Pass 'dating', 'debate', or 'random'
   }) {
     return AnimatedBuilder(
       animation: _floatController,
@@ -148,11 +169,16 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
         double offset = (delay * 10) + (_floatController.value * 10);
         return Transform.translate(
           offset: Offset(0, offset),
+          
           child: GestureDetector(
+            
             onTap: () {
-              // For now, leads to the matching screen
-              Navigator.pushNamed(context, '/matching');
-            },
+                // 1. Dispatch the event with the room type
+                context.read<MatchBloc>().add(StartMatching(roomType: roomType));
+                
+                // 2. Navigate to your finding match screen
+                Navigator.pushNamed(context, '/matching');
+              },
             child: Container(
               margin: const EdgeInsets.only(bottom: 24),
               padding: const EdgeInsets.all(24),

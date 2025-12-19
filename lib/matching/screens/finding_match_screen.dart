@@ -54,10 +54,13 @@ class _MatchLifecycleHandlerState extends State<_MatchLifecycleHandler> with Wid
         listener: (context, state) {
           if (state is MatchFound) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("MATCH FOUND! Room: ${state.roomId}")),
+              SnackBar(content: Text("MATCH FOUND! ")),
             );
             Navigator.pushReplacement(context, MaterialPageRoute(builder: (context){
-              return ChatScreen(roomId: state.roomId);
+              return ChatScreen(roomId: state.roomId , isAi: state.isAi, 
+            partnerName: state.partnerName,
+            roomType: state.roomType, 
+            aiGender: state.aiGender,);
             }));
           }
           // CRITICAL FIX: I removed the "Navigator.pop" here. 
