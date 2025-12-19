@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:virtual_dating/features/chat/widgets/isual_fx_overlay.dart';
 import 'package:virtual_dating/features/chat/widgets/typewriter_chat_bubble.dart';
 import 'package:virtual_dating/services/ai/action_queue_manager.dart';
 import 'package:virtual_dating/services/ai/ai_service.dart';
@@ -114,6 +115,13 @@ class _ChatViewState extends State<_ChatView> with SingleTickerProviderStateMixi
       duration: const Duration(milliseconds: 500), 
       vsync: this
     );
+
+    // This connects the AI's "shake" command to your existing shake animation
+    _actionDirector.visualEffectStream.listen((effect) {
+      if (effect == 'shake') {
+        _shakeController.forward(from: 0);
+      }
+    });
 
     if (widget.isAi) {
       _actionDirector.actionStream.listen((event) {
@@ -306,6 +314,10 @@ Widget _buildChatArea() {
               );
             },
           ),
+
+          // Sits on top of chat, but below UI controls.
+          // It handles the Pink/Red glows and Dark Vignettes.
+          VisualFxOverlay(effectStream: _actionDirector.visualEffectStream),
 
           // B. Typing Indicator (Bottom Left)
           Positioned(

@@ -138,14 +138,19 @@ Future<void> init() async {
     );
   }
 
-  Future<void> incrementUsage(String workerId) async {
-    // Wrap this too, just to be safe
+Future<void> incrementUsage(String workerId) async {
     try {
       final ref = _db.child(workerId);
-      await ref.runTransaction((data) {
-        Map<String, dynamic> stats = (data as Map?) != null
-            ? Map<String, dynamic>.from(data as Map)
-            : {'usage': 0, 'reset_time': DateTime.now().millisecondsSinceEpoch};
+      await ref.runTransaction((Object? data) { // Change to Object? for strict typing
+        Map<String, dynamic> stats;
+        
+        if (data == null) {
+          stats = {'usage': 0, 'reset_time': DateTime.now().millisecondsSinceEpoch};
+        } else {
+          // Standardize the map conversion for Android/iOS
+          final Map<dynamic, dynamic> rawMap = data as Map<dynamic, dynamic>;
+          stats = Map<String, dynamic>.from(rawMap);
+        }
 
         final now = DateTime.now().millisecondsSinceEpoch;
 
