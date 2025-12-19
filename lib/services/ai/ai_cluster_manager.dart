@@ -26,18 +26,26 @@ class AiClusterManager {
   final _db = FirebaseDatabase.instance.ref("api_cluster_status");
   bool _isInitialized = false;
 
-  Future<void> init() async {
+Future<void> init() async {
     if (_isInitialized) return;
     try {
+      // Keep your preferred 10-second limit
       await _remoteConfig.setConfigSettings(RemoteConfigSettings(
         fetchTimeout: const Duration(seconds: 10),
         minimumFetchInterval: const Duration(hours: 1),
       ));
+      
+      print("🚀 Attempting AI Cluster Connection...");
+      
+      // Standard fetch without the 3-second force-stop
       await _remoteConfig.fetchAndActivate();
+      
       _isInitialized = true;
+      print("AI Cluster Connected Successfully");
     } catch (e) {
-      print("⚠️ AI Cluster Init Failed: $e");
-      // We do NOT return here. We let the fallback logic below handle it.
+      print("AI Cluster Connection Failed: $e");
+      // Mark as initialized so the app can at least move to Fallback (Groq)
+      _isInitialized = true; 
     }
   }
 

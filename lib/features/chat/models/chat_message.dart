@@ -6,13 +6,16 @@ class ChatMessage {
   final String text;
   final DateTime timestamp;
   final bool isSticker; 
+  bool isTyped;
 
   ChatMessage({
     required this.id,
+     
     required this.senderId,
     required this.text,
     required this.timestamp,
     this.isSticker = false,
+    this.isTyped  = false,
   });
 
   // Factory: Converts Firebase Document -> Dart Object

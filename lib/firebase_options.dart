@@ -52,9 +52,9 @@ class DefaultFirebaseOptions {
     messagingSenderId: '824033316260',
     projectId: 'virtual-dating-189c7',
     authDomain: 'virtual-dating-189c7.firebaseapp.com',
+    databaseURL: 'https://virtual-dating-189c7-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'virtual-dating-189c7.firebasestorage.app',
     measurementId: 'G-EF91KF2H8T',
-    databaseURL: "https://virtual-dating-189c7-default-rtdb.asia-southeast1.firebasedatabase.app"
   );
 
   static const FirebaseOptions android = FirebaseOptions(
@@ -62,6 +62,7 @@ class DefaultFirebaseOptions {
     appId: '1:824033316260:android:2fbe016a439e8999ba4531',
     messagingSenderId: '824033316260',
     projectId: 'virtual-dating-189c7',
+    databaseURL: 'https://virtual-dating-189c7-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'virtual-dating-189c7.firebasestorage.app',
   );
 
@@ -70,8 +71,11 @@ class DefaultFirebaseOptions {
     appId: '1:824033316260:ios:8ffde5b25f084ddbba4531',
     messagingSenderId: '824033316260',
     projectId: 'virtual-dating-189c7',
+    databaseURL: 'https://virtual-dating-189c7-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'virtual-dating-189c7.firebasestorage.app',
+    androidClientId: '824033316260-rj2vubt9eb7iii8n38921mqa6nvre23p.apps.googleusercontent.com',
     iosClientId: '824033316260-a47mbgk7ub68gk9jdqq0hahalg55789n.apps.googleusercontent.com',
     iosBundleId: 'com.example.virtualDating',
   );
+
 }
