@@ -304,8 +304,15 @@ Widget _buildChatArea() {
             padding: const EdgeInsets.fromLTRB(10, 20, 10, 50),
             itemCount: _aiMessages.length,
             itemBuilder: (context, index) {
+
+              // ... inside itemBuilder ...
               final msg = _aiMessages[index];
               final String uniqueId = msg['id'] ?? msg['timestamp'].toString();
+              
+              // Ensure we have a valid DateTime object
+              final DateTime msgTime = msg['timestamp'] is DateTime 
+                  ? msg['timestamp'] 
+                  : DateTime.now();
 
               // Action Renderer
               if (msg['isAction'] == true) {
@@ -315,6 +322,7 @@ Widget _buildChatArea() {
                   isMe: false,
                   isAlreadyTyped: msg['isTyped'] ?? false,
                   onFinished: () => msg['isTyped'] = true,
+                  startTime: msgTime, // <--- PASS IT HERE
                   isSystemAction: true,
                 );
               }
@@ -326,8 +334,34 @@ Widget _buildChatArea() {
                 isMe: msg['isMe'],
                 isAlreadyTyped: msg['isTyped'] ?? false,
                 onFinished: () => msg['isTyped'] = true,
+                startTime: msgTime, // <--- PASS IT HERE
                 isSystemAction: false,
               );
+
+              // final msg = _aiMessages[index];
+              // final String uniqueId = msg['id'] ?? msg['timestamp'].toString();
+
+              // // Action Renderer
+              // if (msg['isAction'] == true) {
+              //   return TypewriterChatBubble(
+              //     key: ValueKey("act_$uniqueId"),
+              //     text: msg['text'].toString().toUpperCase(),
+              //     isMe: false,
+              //     isAlreadyTyped: msg['isTyped'] ?? false,
+              //     onFinished: () => msg['isTyped'] = true,
+              //     isSystemAction: true,
+              //   );
+              // }
+
+              // // Normal Message Renderer
+              // return TypewriterChatBubble(
+              //   key: ValueKey("msg_$uniqueId"),
+              //   text: msg['text'],
+              //   isMe: msg['isMe'],
+              //   isAlreadyTyped: msg['isTyped'] ?? false,
+              //   onFinished: () => msg['isTyped'] = true,
+              //   isSystemAction: false,
+              // );
             },
           ),
 
@@ -391,6 +425,11 @@ Widget _buildChatArea() {
                     isMe: isMe,
                     isAlreadyTyped: isMe ? true : (msg.isTyped ?? false),
                     onFinished: () => msg.isTyped = true,
+                    
+                    // --- THE FIX: Pass the timestamp here too ---
+                    startTime: msg.timestamp, 
+                    // --------------------------------------------
+                    
                     isSystemAction: false,
                   );
                 },
@@ -409,7 +448,50 @@ Widget _buildChatArea() {
         }
         return const Center(child: CircularProgressIndicator(color: Colors.pinkAccent));
       },
-    );
+    ); 
+    //2. HUMAN CHAT LOGIC
+    // return BlocConsumer<ChatBloc, ChatState>(
+    //   listener: (context, state) {
+    //     if (state is ChatEnded) Navigator.pop(context);
+    //   },
+    //   builder: (context, state) {
+    //     if (state is ChatLoaded) {
+    //       return Stack(
+    //         children: [
+    //           ListView.builder(
+    //             reverse: true,
+    //             addAutomaticKeepAlives: true,
+    //             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 20),
+    //             itemCount: state.messages.length,
+    //             itemBuilder: (context, index) {
+    //               final msg = state.messages[index];
+    //               final isMe = msg.senderId == myUid;
+
+    //               return TypewriterChatBubble(
+    //                 key: ValueKey(msg.id),
+    //                 text: msg.text,
+    //                 isMe: isMe,
+    //                 isAlreadyTyped: isMe ? true : (msg.isTyped ?? false),
+    //                 onFinished: () => msg.isTyped = true,
+    //                 isSystemAction: false,
+    //               );
+    //             },
+    //           ),
+              
+    //           // Inactivity Monitor for Humans
+    //           Positioned(
+    //             bottom: 0, left: 0, right: 0,
+    //             child: InactivityMonitor(
+    //               lastActivityTime: state.messages.isNotEmpty ? state.messages.first.timestamp : DateTime.now(),
+    //               onTimeout: () => context.read<ChatBloc>().add(EndChat(widget.roomId)),
+    //             ),
+    //           ),
+    //         ],
+    //       );
+    //     }
+    //     return const Center(child: CircularProgressIndicator(color: Colors.pinkAccent));
+    //   },
+    // );
   }
 
   // Widget _buildChatArea() {
