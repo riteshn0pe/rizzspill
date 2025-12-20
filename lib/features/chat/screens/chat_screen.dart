@@ -164,7 +164,7 @@ void _playSentSound() {
   Future<void> _initAudio() async {
     try {
       await _bgmPlayer.setReleaseMode(ReleaseMode.loop);
-      await _bgmPlayer.setVolume(0.2);
+      await _bgmPlayer.setVolume(0.1);
       await _bgmPlayer.play(AssetSource('sounds/bg1.mp3'));
       if (mounted) {
         _isMusicPlaying.value = true;

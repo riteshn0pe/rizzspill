@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
+import 'package:virtual_dating/features/chat/widgets/typing_sound_controller.dart';
+
 
 class TypewriterChatBubble extends StatefulWidget {
   final String text;
@@ -27,16 +28,16 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
   late AnimationController _controller;
   late Animation<int> _characterCount;
 
-  // 1. CLASS-LEVEL AUDIO PLAYER (Accessible by all methods)
-  final AudioPlayer _typeSoundPlayer = AudioPlayer();
-
   @override
-  bool get wantKeepAlive => true; // Prevents the bubble from resetting when scrolling
+  bool get wantKeepAlive => true; // Prevents disposal during scrolling
 
   @override
   void initState() {
     super.initState();
     
+    // 2. INIT THE SHARED CONTROLLER (Safe to call multiple times)
+    TypingSoundController().init();
+
     // 60ms/char for natural speed
     final duration = Duration(milliseconds: 60 * widget.text.length);
     _controller = AnimationController(vsync: this, duration: duration);
@@ -45,40 +46,27 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
       CurvedAnimation(parent: _controller, curve: Curves.linear),
     );
 
-    // 2. STATUS LISTENER: Triggers the master lock in parent data
+    // 3. LOGIC: Delegate Start/Stop to the Global Controller
     _controller.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        widget.onFinished(); 
+      if (status == AnimationStatus.forward) {
+        // Only trigger sound for the AI (Partner)
+        if (!widget.isMe && !widget.isAlreadyTyped) {
+           TypingSoundController().startTyping();
+        }
+      } else if (status == AnimationStatus.completed) {
+        // Stop sound only if we started it
+        if (!widget.isMe && !widget.isAlreadyTyped) {
+           TypingSoundController().stopTyping();
+        }
+        widget.onFinished(); // Lock the data
       }
     });
 
-    // 3. SOUND LISTENER: Plays the click on every character change
-    _characterCount.addListener(() {
-      // Play sound only for the AI partner while the text is actively typing
-      if (!widget.isMe && !widget.isAlreadyTyped && _controller.isAnimating) {
-        _playClick();
-      }
-    });
-
-    // 4. CRITICAL SYNC LOGIC
-    // If it's your message OR already typed, show immediately. Otherwise, animate.
+    // CRITICAL SYNC LOGIC
     if (widget.isMe || widget.isAlreadyTyped) {
       _controller.value = 1.0; 
     } else {
       _controller.forward();
-    }
-  }
-
-  // Optimized sound trigger using a low volume mechanical click
-  Future<void> _playClick() async {
-    try {
-      // Ensure the sound file path matches your assets folder
-      await _typeSoundPlayer.play(
-        AssetSource('sounds/keyboard_typing_sound.mp3'), 
-        volume: 0.1
-      );
-    } catch (e) {
-      debugPrint("Audio Play Error: $e");
     }
   }
 
@@ -89,6 +77,8 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
       _controller.duration = Duration(milliseconds: 60 * widget.text.length);
       if (widget.isAlreadyTyped || widget.isMe) {
         _controller.value = 1.0;
+        // Ensure sound stops if we force-finish via update
+        TypingSoundController().stopTyping();
       } else {
         _controller.forward(from: 0.0);
       }
@@ -97,16 +87,19 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
 
   @override
   void dispose() {
-    // 5. CLEANUP: Prevent memory leaks and background audio play
-    _typeSoundPlayer.dispose();
+    // 4. SAFETY STOP: If destroyed while animating (e.g., navigating away)
+    if (_controller.isAnimating && !widget.isMe && !widget.isAlreadyTyped) {
+      TypingSoundController().stopTyping();
+    }
     _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    super.build(context); // Required for KeepAlive
     
+    // If it is a system action, we use a different container style (centered, no box)
     if (widget.isSystemAction) {
       return Container(
         alignment: Alignment.center,
@@ -153,7 +146,7 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
         fontFamily: 'Courier',
         fontSize: 12,
         fontStyle: FontStyle.italic,
-        letterSpacing: 1.2,
+        letterSpacing: 1.2, // Spacing for cinematic effect
       );
     }
     return TextStyle(
@@ -172,9 +165,9 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
 // class TypewriterChatBubble extends StatefulWidget {
 //   final String text;
 //   final bool isMe;
-//   final bool isAlreadyTyped; // Master lock from parent data
-//   final VoidCallback onFinished; // Callback to lock the data
-//   final bool isSystemAction; // New property for styling actions
+//   final bool isAlreadyTyped; 
+//   final VoidCallback onFinished; 
+//   final bool isSystemAction; 
 
 //   const TypewriterChatBubble({
 //     required Key key, // Mandatory key for list stability
@@ -184,8 +177,6 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
 //     required this.onFinished,
 //     this.isSystemAction = false,
 //   }) : super(key: key);
-
-  
 
 //   @override
 //   State<TypewriterChatBubble> createState() => _TypewriterChatBubbleState();
@@ -197,10 +188,11 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
 //   late AnimationController _controller;
 //   late Animation<int> _characterCount;
 
+//   // 1. CLASS-LEVEL AUDIO PLAYER (Accessible by all methods)
 //   final AudioPlayer _typeSoundPlayer = AudioPlayer();
 
 //   @override
-//   bool get wantKeepAlive => true; // Prevents disposal during scrolling
+//   bool get wantKeepAlive => true; // Prevents the bubble from resetting when scrolling
 
 //   @override
 //   void initState() {
@@ -214,29 +206,23 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
 //       CurvedAnimation(parent: _controller, curve: Curves.linear),
 //     );
 
+//     // 2. STATUS LISTENER: Triggers the master lock in parent data
 //     _controller.addStatusListener((status) {
 //       if (status == AnimationStatus.completed) {
-//         widget.onFinished(); // Persistent lock in parent data
+//         widget.onFinished(); 
 //       }
-//     }
-    
-    
-//     );
+//     });
 
-    
+//     // 3. SOUND LISTENER: Plays the click on every character change
+//     _characterCount.addListener(() {
+//       // Play sound only for the AI partner while the text is actively typing
+//       if (!widget.isMe && !widget.isAlreadyTyped && _controller.isAnimating) {
+//         _playClick();
+//       }
+//     });
 
-
-//     // Add a listener to play sound on character change
-//   _characterCount.addListener(() {
-//     // Only play sound if it's NOT the user's message and NOT already typed
-//     if (!widget.isMe && !widget.isAlreadyTyped) {
-//       _playClick();
-//     }
-//   });
-
-//     // CRITICAL SYNC LOGIC
-//     // If it's your message OR the data says it's already typed, 
-//     // we set the controller to 1.0 immediately.
+//     // 4. CRITICAL SYNC LOGIC
+//     // If it's your message OR already typed, show immediately. Otherwise, animate.
 //     if (widget.isMe || widget.isAlreadyTyped) {
 //       _controller.value = 1.0; 
 //     } else {
@@ -244,17 +230,19 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
 //     }
 //   }
 
-
-  
-
-
-
+//   // Optimized sound trigger using a low volume mechanical click
 //   Future<void> _playClick() async {
-//   // Use a low volume so it's not annoying
-//   await _typeSoundPlayer.play(AssetSource('sounds/keyboard_typing_sound.mp3'), volume: 0.1);
-// }
+//     try {
+//       // Ensure the sound file path matches your assets folder
+//       await _typeSoundPlayer.play(
+//         AssetSource('sounds/keyboard_typing_sound.mp3'), 
+//         volume: 0.1
+//       );
+//     } catch (e) {
+//       debugPrint("Audio Play Error: $e");
+//     }
+//   }
 
-//   // Handle case where the list item is reused for a different message
 //   @override
 //   void didUpdateWidget(TypewriterChatBubble oldWidget) {
 //     super.didUpdateWidget(oldWidget);
@@ -270,16 +258,16 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
 
 //   @override
 //   void dispose() {
-//     _typeSoundPlayer.dispose();// CRITICAL: Prevent memory leaks
+//     // 5. CLEANUP: Prevent memory leaks and background audio play
+//     _typeSoundPlayer.dispose();
 //     _controller.dispose();
 //     super.dispose();
 //   }
 
 //   @override
 //   Widget build(BuildContext context) {
-//     super.build(context); // Required for KeepAlive
+//     super.build(context); // Required for AutomaticKeepAliveClientMixin
     
-//     // If it is a system action, we use a different container style (centered, no box)
 //     if (widget.isSystemAction) {
 //       return Container(
 //         alignment: Alignment.center,
@@ -326,7 +314,7 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
 //         fontFamily: 'Courier',
 //         fontSize: 12,
 //         fontStyle: FontStyle.italic,
-//         letterSpacing: 1.2, // Spacing for cinematic effect
+//         letterSpacing: 1.2,
 //       );
 //     }
 //     return TextStyle(
@@ -337,3 +325,4 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
 //     );
 //   }
 // }
+

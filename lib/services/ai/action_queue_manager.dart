@@ -21,7 +21,7 @@ class ActionQueueManager {
   final _controller = StreamController<ActionEvent>.broadcast();
   Stream<ActionEvent> get actionStream => _controller.stream;
   
-  // 2. NEW: Visual Effect Stream (For Screen Shake/Glow)
+  // 2. Visual Effect Stream (For Screen Shake/Glow)
   final _visualFxController = StreamController<String>.broadcast();
   Stream<String> get visualEffectStream => _visualFxController.stream;
   
@@ -46,11 +46,20 @@ class ActionQueueManager {
 
     for (var actionMap in actionList) {
       final String code = actionMap['code'] ?? "";
-      final int delay = actionMap['delay'] ?? 0;
       
-      // Accumulate delays so actions happen in sequence, not all at once
-      // e.g. Action 1 at 1s, Action 2 at 11s (1+10), etc.
-      cumulativeDelay += delay;
+      // --- THE TIMING FIX STARTS HERE ---
+      // We grab the delay the AI suggested
+      int rawDelay = actionMap['delay'] ?? 0;
+
+      // FIX: If AI suggests a fast delay (< 5s), force it to 10s.
+      // Exception: The very first action (when cumulativeDelay is 0) can be fast (1s).
+      if (rawDelay < 5 && cumulativeDelay > 0) {
+         rawDelay = 10; 
+      }
+      // --- TIMING FIX ENDS ---
+
+      // Accumulate delays so actions happen in sequence
+      cumulativeDelay += rawDelay;
 
       final timer = Timer(Duration(seconds: cumulativeDelay), () {
         if (!_controller.isClosed) {
@@ -82,7 +91,8 @@ class ActionQueueManager {
              lowerCode.contains("slam") || 
              lowerCode.contains("shout") ||
              lowerCode.contains("stand_up") ||
-             lowerCode.contains("glitch")) {
+             lowerCode.contains("glitch") || 
+             lowerCode.contains("leave")) {
       _visualFxController.add("shake");
     } 
     // INTIMACY / FOCUS -> Vignette Darkening
@@ -104,7 +114,7 @@ class ActionQueueManager {
   void dispose() {
     interrupt();
     _controller.close();
-    _visualFxController.close(); // Close the new stream
+    _visualFxController.close(); 
   }
 }
 
