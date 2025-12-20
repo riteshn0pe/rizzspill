@@ -6,7 +6,7 @@ class StartMatching extends MatchEvent {
   final String roomType; // Add this field
 
   // Constructor with a default value to prevent null issues
-  StartMatching({this.roomType = 'dating'});
+  StartMatching(String s, {this.roomType = 'dating'});
 }
 
 // Internal event triggered by the timer

@@ -174,7 +174,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
             
             onTap: () {
                 // 1. Dispatch the event with the room type
-                context.read<MatchBloc>().add(StartMatching(roomType: roomType));
+                context.read<MatchBloc>().add(StartMatching("dating"));
                 
                 // 2. Navigate to your finding match screen
                 Navigator.pushNamed(context, '/matching');
