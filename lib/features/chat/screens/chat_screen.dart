@@ -98,6 +98,12 @@ class _ChatViewState extends State<_ChatView> with SingleTickerProviderStateMixi
   final AudioPlayer _bgmPlayer = AudioPlayer();
   bool _audioInitialized = false; 
 
+  final AudioPlayer _sfxPlayer = AudioPlayer(); // For general SFX
+
+void _playSentSound() {
+  _sfxPlayer.play(AssetSource('sounds/send_msg_sound.mp3'), volume: 0.3);
+}
+
   // GAME STATS
   final ValueNotifier<double> _vibe = ValueNotifier(0.3);
   final ValueNotifier<double> _trust = ValueNotifier(0.1);
@@ -139,8 +145,18 @@ class _ChatViewState extends State<_ChatView> with SingleTickerProviderStateMixi
         // 3. Handle Visual Actions
         if (event.action != null) {
           _handleVisualAction(event.action!);
+
+
+          
         }
+
+        
+
+        
       });
+
+
+      
     }
   }
 
@@ -498,7 +514,8 @@ Widget _buildChatArea() {
   //   );
   // }
 
-  Widget _buildInputArea(BuildContext context) {
+
+Widget _buildInputArea(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -511,6 +528,9 @@ Widget _buildChatArea() {
             child: TextField(
               controller: _textController,
               style: const TextStyle(color: Colors.greenAccent, fontFamily: 'Courier'), 
+              // 1. KEYBINDING: Configures the "Enter" key on hardware and virtual keyboards
+              textInputAction: TextInputAction.send,
+              onSubmitted: (value) => _handleSend(value), // Triggers when Enter is pressed
               decoration: InputDecoration(
                 hintText: "[SAY] > ...",
                 hintStyle: TextStyle(color: Colors.greenAccent.withOpacity(0.3)),
@@ -522,42 +542,45 @@ Widget _buildChatArea() {
           const SizedBox(width: 10),
           IconButton(
             icon: const Icon(Icons.send, color: Colors.pinkAccent),
-            onPressed: () async {
-              final text = _textController.text.trim();
-              if (text.isEmpty) return;
-
-              _textController.clear();
-              _processTurn(text);
-
-              // 1. Add User Message Locally
-              _addMessageToLocalList(text, isMe: true);
-
-              if (widget.isAi) {
-                // 2. Start Typing Indicator
-                _isAiTyping.value = true;
-                _actionDirector.interrupt(); 
-                
-                // 3. Send to AI
-                try {
-                  final aiResponse = await _aiService.sendMessage(
-                    message: text,
-                    aiTargetGender: widget.aiGender,
-                    userGender: "male", 
-                    roomType: widget.roomType,
-                  );
-                  _actionDirector.processAiResponse(aiResponse);
-                } catch (e) {
-                  _isAiTyping.value = false;
-                  debugPrint("AI Failure: $e");
-                }
-              } else {
-                context.read<ChatBloc>().add(SendMessage(widget.roomId, text));
-              }
-            },
+            onPressed: () => _handleSend(_textController.text),
           )
         ],
       ),
     );
+  }
+
+  // 2. CONSOLIDATED SEND HANDLER (Logic with Sound)
+  Future<void> _handleSend(String rawText) async {
+    final text = rawText.trim();
+    if (text.isEmpty) return;
+
+    // A. Clear and Play Sent Sound
+    _textController.clear();
+    _playSentSound(); // Triggers the existing _playSentSound method
+    _processTurn(text);
+
+    // B. Add User Message Locally
+    _addMessageToLocalList(text, isMe: true);
+
+    if (widget.isAi) {
+      _isAiTyping.value = true;
+      _actionDirector.interrupt(); 
+      
+      try {
+        final aiResponse = await _aiService.sendMessage(
+          message: text,
+          aiTargetGender: widget.aiGender,
+          userGender: "male", 
+          roomType: widget.roomType,
+        );
+        _actionDirector.processAiResponse(aiResponse);
+      } catch (e) {
+        _isAiTyping.value = false;
+        debugPrint("AI Failure: $e");
+      }
+    } else {
+      context.read<ChatBloc>().add(SendMessage(widget.roomId, text));
+    }
   }
 
   AppBar _buildAppBar(BuildContext context) {
