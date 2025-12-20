@@ -6,11 +6,11 @@ class ChatRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // 1. LISTEN TO MESSAGES
-  // Changed arg to 'chatPath' (e.g., "couples/A_B/sessions/xyz")
+  // --- EXISTING HUMAN CHAT METHODS (UNCHANGED) ---
+
   Stream<List<ChatMessage>> getMessages(String chatPath) {
     return _firestore
-        .doc(chatPath) // Uses the full path directly
+        .doc(chatPath) 
         .collection('messages')
         .orderBy('timestamp', descending: true)
         .snapshots()
@@ -21,13 +21,12 @@ class ChatRepository {
         });
   }
 
-  // 2. SEND MESSAGE
   Future<void> sendMessage(String chatPath, String text) async {
     final myUid = _auth.currentUser?.uid;
     if (myUid == null) return;
 
     await _firestore
-        .doc(chatPath) // Uses full path
+        .doc(chatPath) 
         .collection('messages')
         .add({
       'text': text,
@@ -36,24 +35,76 @@ class ChatRepository {
       'isSticker': false,
     });
     
-    // Optional: Update the Session document with last message for previews
     await _firestore.doc(chatPath).update({
       'lastMessage': text,
       'lastMessageTime': FieldValue.serverTimestamp(),
     });
   }
 
-  // 3. END CHAT (Soft Delete)
   Future<void> endChat(String chatPath) async {
     final myUid = _auth.currentUser?.uid;
     if (myUid == null) return;
 
-    // Soft delete just THIS session
     await _firestore.doc(chatPath).update({
       'status': 'ended',
       'endedBy': myUid,
       'endedAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  // --- NEW: AI SESSION ARCHIVE (Step 3) ---
+  
+  /// Performs a "Single Write" to save the entire AI session to Firestore.
+  /// Returns TRUE if successful, FALSE if network failed.
+  Future<bool> archiveAiSession({
+    required String roomId,
+    required String partnerName,
+    required List<Map<String, dynamic>> messages,
+    required Map<String, double> stats,
+    required int turnCount,
+  }) async {
+    final myUid = _auth.currentUser?.uid;
+    if (myUid == null) return false;
+
+    try {
+      // Create a dedicated collection for analytics/history
+      // Structure: ai_chats_archived/{sessionId}
+      await _firestore.collection('ai_chats_archived').doc(roomId).set({
+        'userId': myUid,
+        'partnerName': partnerName,
+        'roomId': roomId,
+        'archivedAt': FieldValue.serverTimestamp(),
+        
+        // Save Stats
+        'finalStats': {
+          'vibe': stats['vibe'],
+          'trust': stats['trust'],
+          'tension': stats['tension'],
+          'turns': turnCount,
+        },
+
+        // Save Full History (Optimized: One Array)
+        // We limit to last 100 messages to respect Firestore document size limits (1MB)
+        'messages': messages.take(100).map((m) {
+          // Convert DateTime to Firestore Timestamp for consistency
+          final timestamp = m['timestamp'] is DateTime 
+              ? Timestamp.fromDate(m['timestamp']) 
+              : Timestamp.now();
+              
+          return {
+            'text': m['text'],
+            'isMe': m['isMe'],
+            'isAction': m['isAction'] ?? false,
+            'timestamp': timestamp,
+          };
+        }).toList(),
+      });
+      
+      return true; // Sync Success
+    } catch (e) {
+      print("Archive Failed (Offline?): $e");
+      return false; // Sync Failed (Will retry later)
+    }
   }
 }
 
@@ -65,13 +116,13 @@ class ChatRepository {
 //   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 //   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-//   // 1. LISTEN TO MESSAGES (Realtime Stream)
-//   Stream<List<ChatMessage>> getMessages(String roomId) {
+//   // 1. LISTEN TO MESSAGES
+//   // Changed arg to 'chatPath' (e.g., "couples/A_B/sessions/xyz")
+//   Stream<List<ChatMessage>> getMessages(String chatPath) {
 //     return _firestore
-//         .collection('rooms')
-//         .doc(roomId)
-//         .collection('messages') // Sub-collection query
-//         .orderBy('timestamp', descending: true) // Newest first
+//         .doc(chatPath) // Uses the full path directly
+//         .collection('messages')
+//         .orderBy('timestamp', descending: true)
 //         .snapshots()
 //         .map((snapshot) {
 //           return snapshot.docs
@@ -81,13 +132,12 @@ class ChatRepository {
 //   }
 
 //   // 2. SEND MESSAGE
-//   Future<void> sendMessage(String roomId, String text) async {
+//   Future<void> sendMessage(String chatPath, String text) async {
 //     final myUid = _auth.currentUser?.uid;
 //     if (myUid == null) return;
 
 //     await _firestore
-//         .collection('rooms')
-//         .doc(roomId)
+//         .doc(chatPath) // Uses full path
 //         .collection('messages')
 //         .add({
 //       'text': text,
@@ -96,21 +146,20 @@ class ChatRepository {
 //       'isSticker': false,
 //     });
     
-//     // Optional: Update parent room "lastMessage" for the home screen preview
-//     await _firestore.collection('rooms').doc(roomId).update({
+//     // Optional: Update the Session document with last message for previews
+//     await _firestore.doc(chatPath).update({
 //       'lastMessage': text,
 //       'lastMessageTime': FieldValue.serverTimestamp(),
 //     });
 //   }
 
-//   // 3. END CHAT (Soft Delete / Unmatch)
-//   Future<void> endChat(String roomId) async {
+//   // 3. END CHAT (Soft Delete)
+//   Future<void> endChat(String chatPath) async {
 //     final myUid = _auth.currentUser?.uid;
 //     if (myUid == null) return;
 
-//     // We DO NOT delete data. We mark it as 'ended'.
-//     // This hides it from the UI but keeps it safe in DB.
-//     await _firestore.collection('rooms').doc(roomId).update({
+//     // Soft delete just THIS session
+//     await _firestore.doc(chatPath).update({
 //       'status': 'ended',
 //       'endedBy': myUid,
 //       'endedAt': FieldValue.serverTimestamp(),

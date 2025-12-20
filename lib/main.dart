@@ -19,6 +19,8 @@ import 'firebase_options.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:hydrated_bloc/hydrated_bloc.dart'; 
+import 'package:path_provider/path_provider.dart';
 
 // --- BLOC IMPORTS ---
 
@@ -36,6 +38,12 @@ void main() async {
   } else {
     Firebase.app(); // Use the existing initialized app
   }
+
+  // 2. INITIALIZE HYDRATED STORAGE (The Storage Engine)
+  final storageDir = await getApplicationDocumentsDirectory();
+  HydratedBloc.storage = await HydratedStorage.build(
+    storageDirectory: HydratedStorageDirectory(storageDir.path), // <--- CHANGED THIS
+  );
 
   runApp(const MyApp());
 }

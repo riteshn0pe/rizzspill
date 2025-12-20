@@ -30,4 +30,31 @@ class ChatMessage {
       isSticker: data['isSticker'] ?? false,
     );
   }
+
+  // 1. Convert Object to Map (for saving)
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'text': text,
+      'senderId': senderId,
+      // Save as string ISO format for local storage safety
+      'timestamp': timestamp.toIso8601String(),
+      'isTyped': isTyped,
+    };
+  }
+
+  // 2. Create Object from Map (for loading)
+  factory ChatMessage.fromMap(Map<String, dynamic> map) {
+    return ChatMessage(
+      id: map['id'] ?? '',
+      text: map['text'] ?? '',
+      senderId: map['senderId'] ?? '',
+      // Handle both String (local) and Timestamp (Firestore) formats safely
+      timestamp: map['timestamp'] is Timestamp 
+          ? (map['timestamp'] as Timestamp).toDate() 
+          : DateTime.parse(map['timestamp']),
+      isTyped: map['isTyped'] ?? false,
+    );
+  }
+
 }
