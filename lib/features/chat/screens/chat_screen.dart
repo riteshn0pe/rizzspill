@@ -478,7 +478,7 @@ class _ChatViewState extends State<_ChatView> with SingleTickerProviderStateMixi
     );
   }
 
-  Future<void> _handleSend(String rawText) async {
+Future<void> _handleSend(String rawText) async {
     final text = rawText.trim();
     if (text.isEmpty) return;
 
@@ -489,16 +489,26 @@ class _ChatViewState extends State<_ChatView> with SingleTickerProviderStateMixi
     // B. Add User Message Locally (Dispatched to Bloc)
     _dispatchMessageToBloc(text, isMe: true);
 
-if (widget.isAi) {
+    if (widget.isAi) {
       _isAiTyping.value = true;
       _actionDirector.interrupt(); 
       
+      // GET HISTORY FROM BLOC STATE
+      // We need the current list of messages to send as context.
+      List<Map<String, dynamic>> currentHistory = [];
+      final currentState = context.read<ChatBloc>().state;
+      if (currentState is AiChatLoaded) {
+        currentHistory = currentState.messages;
+      }
+
       try {
         final aiResponse = await _aiService.sendMessage(
           message: text,
+          previousMessages: currentHistory, // <--- PASSING CONTEXT HERE
           aiTargetGender: widget.aiGender,
           userGender: widget.userGender, 
           roomType: widget.roomType,
+          userAge: widget.userAge,
         );
         _actionDirector.processAiResponse(aiResponse);
       } catch (e) {
@@ -509,6 +519,37 @@ if (widget.isAi) {
       context.read<ChatBloc>().add(SendMessage(widget.roomId, text));
     }
   }
+  // Future<void> _handleSend(String rawText) async {
+  //   final text = rawText.trim();
+  //   if (text.isEmpty) return;
+
+  //   _textController.clear();
+  //   _playSentSound(); 
+  //   _processTurn(text);
+
+  //   // B. Add User Message Locally (Dispatched to Bloc)
+  //   _dispatchMessageToBloc(text, isMe: true);
+
+  //   if (widget.isAi) {
+  //     _isAiTyping.value = true;
+  //     _actionDirector.interrupt(); 
+      
+  //     try {
+  //       final aiResponse = await _aiService.sendMessage(
+  //         message: text,
+  //         aiTargetGender: widget.aiGender,
+  //         userGender: widget.userGender, 
+  //         roomType: widget.roomType,
+  //       );
+  //       _actionDirector.processAiResponse(aiResponse);
+  //     } catch (e) {
+  //       _isAiTyping.value = false;
+  //       debugPrint("AI Failure: $e");
+  //     }
+  //   } else {
+  //     context.read<ChatBloc>().add(SendMessage(widget.roomId, text));
+  //   }
+  // }
 
   AppBar _buildAppBar(BuildContext context) {
     return AppBar(

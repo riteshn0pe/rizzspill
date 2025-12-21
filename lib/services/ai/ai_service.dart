@@ -112,10 +112,11 @@ class AiService {
       print("⚠️ Memory Consolidation failed: $e");
     }
   }
-
-  // --- PRIMARY MESSAGE HANDLER ---
+// --- PRIMARY MESSAGE HANDLER (UPDATED) ---
   Future<Map<String, dynamic>> sendMessage({
     required String message,
+    // NEW ARGUMENT: Receive history from the Bloc
+    required List<Map<String, dynamic>> previousMessages, 
     String? aiTargetGender,
     String? userGender,
     String? roomType,
@@ -130,7 +131,7 @@ class AiService {
     if (retryCount > 2) {
       return {
         "message": "Connection lost... | //leave~0",
-        "actions": [{"code": "//glitch", "delay": 1}, {"code": "//leave", "delay": 5}],
+        "actions": [{"code": "//glitch", "delay": 1}],
         "parameters": {"vibe": 0.0, "trust": 0.0, "tension": 0.0}
       };
     }
@@ -139,11 +140,21 @@ class AiService {
       final WorkerNode worker = await _manager.getBestWorker();
       await _manager.incrementUsage(worker.id);
       
-      // 1. Memory Management
-      await _consolidateMemory(worker.key);
-      _conversationHistory.add({"role": "user", "content": message});
+      // --- MEMORY INJECTION START ---
+      // 1. Rebuild internal history from the Bloc's authoritative list.
+      // We take the last 10 messages to ensure context is fresh but keeps tokens low.
+      _conversationHistory = previousMessages.take(10).map((m) {
+        return {
+          "role": m['isMe'] == true ? "user" : "assistant",
+          "content": m['text'].toString()
+        };
+      }).toList().reversed.toList(); // Reverse because Bloc stores newest at index 0
 
-      // 2. Build Prompt
+      // 2. Add the CURRENT message to this history
+      _conversationHistory.add({"role": "user", "content": message});
+      // --- MEMORY INJECTION END ---
+
+      // 3. Build Prompt (Keep your existing _buildDynamicSystemPrompt call logic)
       final String systemPrompt = _buildDynamicSystemPrompt(
         aiTargetGender: finalAiGender,
         userGender: finalUserGender,
@@ -153,6 +164,7 @@ class AiService {
       );
 
       String rawJson = "";
+      
       if (worker.provider == 'gemini') {
         rawJson = await _callGemini(worker.key, systemPrompt);
       } else {
@@ -162,15 +174,13 @@ class AiService {
       final cleanedJson = rawJson.replaceAll('```json', '').replaceAll('```', '').trim();
       final Map<String, dynamic> result = jsonDecode(cleanedJson);
 
-      // 3. Add AI reply to history for next turn
-      _conversationHistory.add({"role": "assistant", "content": result['message'] ?? ""});
-
       return result;
 
     } catch (e) {
       print("AI Service Error (Attempt $retryCount): $e");
       return await sendMessage(
         message: message,
+        previousMessages: previousMessages, // Pass the list to the retry
         aiTargetGender: finalAiGender,
         userGender: finalUserGender,
         roomType: finalRoomType,
@@ -179,23 +189,109 @@ class AiService {
       );
     }
   }
+  // --- PRIMARY MESSAGE HANDLER ---
+  // Future<Map<String, dynamic>> sendMessage({
+  //   required String message,
+  //   String? aiTargetGender,
+  //   String? userGender,
+  //   String? roomType,
+  //   String? userAge,
+  //   int retryCount = 0,
+  // }) async {
+  //   final String finalAiGender = aiTargetGender ?? 'female';
+  //   final String finalUserGender = userGender ?? 'male';
+  //   final String finalRoomType = roomType ?? 'dating';
+  //   final String finalUserAge = userAge ?? "22";
+
+  //   if (retryCount > 2) {
+  //     return {
+  //       "message": "Connection lost... | //leave~0",
+  //       "actions": [{"code": "//glitch", "delay": 1}, {"code": "//leave", "delay": 5}],
+  //       "parameters": {"vibe": 0.0, "trust": 0.0, "tension": 0.0}
+  //     };
+  //   }
+
+  //   try {
+  //     final WorkerNode worker = await _manager.getBestWorker();
+  //     await _manager.incrementUsage(worker.id);
+      
+  //     // 1. Memory Management
+  //     await _consolidateMemory(worker.key);
+  //     _conversationHistory.add({"role": "user", "content": message});
+
+  //     // 2. Build Prompt
+  //     final String systemPrompt = _buildDynamicSystemPrompt(
+  //       aiTargetGender: finalAiGender,
+  //       userGender: finalUserGender,
+  //       roomType: finalRoomType,
+  //       userAge: finalUserAge,
+  //       summary: _runningSummary,
+  //     );
+
+  //     String rawJson = "";
+  //     if (worker.provider == 'gemini') {
+  //       rawJson = await _callGemini(worker.key, systemPrompt);
+  //     } else {
+  //       rawJson = await _callGroq(worker.key, systemPrompt);
+  //     }
+
+  //     final cleanedJson = rawJson.replaceAll('```json', '').replaceAll('```', '').trim();
+  //     final Map<String, dynamic> result = jsonDecode(cleanedJson);
+
+  //     // 3. Add AI reply to history for next turn
+  //     _conversationHistory.add({"role": "assistant", "content": result['message'] ?? ""});
+
+  //     return result;
+
+  //   } catch (e) {
+  //     print("AI Service Error (Attempt $retryCount): $e");
+  //     return await sendMessage(
+  //       message: message,
+  //       aiTargetGender: finalAiGender,
+  //       userGender: finalUserGender,
+  //       roomType: finalRoomType,
+  //       userAge: finalUserAge,
+  //       retryCount: retryCount + 1
+  //     );
+  //   }
+  // }
 
   // --- UPDATED PROVIDERS TO USE HISTORY ---
-  
+
   Future<String> _callGemini(String key, String systemPrompt) async {
-    final model = GenerativeModel(model: 'gemini-1.5-pro', apiKey: key);
+    // FIX: Changed model to 'gemini-1.5-flash' to support v1beta API and prevent crash
+    final model = GenerativeModel(model: 'gemini-1.5-flash', apiKey: key);
     
-    // Map our history to Gemini's Content objects
+    // Convert our internal Map history to Gemini's 'Content' objects
     final historyContent = _conversationHistory.map((m) {
-      return m['role'] == 'user' ? Content.text(m['content']!) : Content.model([TextPart(m['content']!)]);
+      return m['role'] == 'user' 
+          ? Content.text(m['content']!) 
+          : Content.model([TextPart(m['content']!)]);
     }).toList();
 
+    // Send System Prompt + History
     final response = await model.generateContent([
       Content.text(systemPrompt),
       ...historyContent
     ]);
+    
     return response.text ?? "{}";
   }
+  
+  // Future<String> _callGemini(String key, String systemPrompt) async {
+  //   final model = GenerativeModel(model: 'gemini-1.5-pro', apiKey: key);
+    
+  //   // Map our history to Gemini's Content objects
+  //   final historyContent = _conversationHistory.map((m) {
+  //     return m['role'] == 'user' ? Content.text(m['content']!) : Content.model([TextPart(m['content']!)]);
+  //   }).toList();
+
+  //   final response = await model.generateContent([
+  //     Content.text(systemPrompt),
+  //     ...historyContent
+  //   ]);
+  //   return response.text ?? "{}";
+  // }
 
   Future<String> _callGroq(String key, String systemPrompt) async {
     final url = Uri.parse('https://api.groq.com/openai/v1/chat/completions');

@@ -1,4 +1,5 @@
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:virtual_dating/auth/auth_bloc.dart';
@@ -39,11 +40,25 @@ void main() async {
     Firebase.app(); // Use the existing initialized app
   }
 
-  // 2. INITIALIZE HYDRATED STORAGE (The Storage Engine)
-  final storageDir = await getApplicationDocumentsDirectory();
-  HydratedBloc.storage = await HydratedStorage.build(
-    storageDirectory: HydratedStorageDirectory(storageDir.path), // <--- CHANGED THIS
-  );
+
+// 2. INITIALIZE HYDRATED STORAGE (Fixed for Web)
+if (kIsWeb) {
+    // Chrome Fix: Use the specialized web directory
+    HydratedBloc.storage = await HydratedStorage.build(
+      storageDirectory: HydratedStorageDirectory.web,
+    );
+  } else {
+    // Original Android Logic: Reverted to your exact previous working method
+    final storageDir = await getApplicationDocumentsDirectory();
+    HydratedBloc.storage = await HydratedStorage.build(
+      storageDirectory: HydratedStorageDirectory(storageDir.path),
+    );
+  }
+  // // 2. INITIALIZE HYDRATED STORAGE (The Storage Engine)
+  // final storageDir = await getApplicationDocumentsDirectory();
+  // HydratedBloc.storage = await HydratedStorage.build(
+  //   storageDirectory: HydratedStorageDirectory(storageDir.path), // <--- CHANGED THIS
+  // );
 
   runApp(const MyApp());
 }
