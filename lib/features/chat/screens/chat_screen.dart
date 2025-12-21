@@ -199,11 +199,10 @@ class _ChatViewState extends State<_ChatView> with SingleTickerProviderStateMixi
     }
   }
 
-  // REPLACED: Instead of setState local list, we dispatch to Bloc
-  void _handleVisualAction(String actionCode) {
+void _handleVisualAction(String actionCode) {
     String cleanAction = actionCode.replaceAll("//", "").replaceAll("_", " ");
     
-    // 1. Send Action Message to Bloc
+    // 1. Send Action Message to Bloc (Unchanged)
     final actionMap = {
       "id": "act_${DateTime.now().millisecondsSinceEpoch}_${actionCode.length}", 
       "text": "* $cleanAction *",
@@ -214,14 +213,42 @@ class _ChatViewState extends State<_ChatView> with SingleTickerProviderStateMixi
     };
     context.read<ChatBloc>().add(AddAiMessage(actionMap));
 
-    // 2. Trigger Local Animations
-    if (actionCode.contains("angry") || actionCode.contains("creepy")) {
+    // 2. Trigger Local Animations (UPDATED for new logic)
+    // We only trigger physical SHAKE here. Colors are handled by VisualFxOverlay.
+    if (actionCode.toLowerCase().contains("shake") || 
+        actionCode.toLowerCase().contains("angry") || 
+        actionCode.toLowerCase().contains("slam")) {
       _shakeController.forward(from: 0);
     }
-    if (actionCode.contains("leave") || actionCode.contains("stand_up")) {
+    
+    if (actionCode.toLowerCase().contains("leave") || 
+        actionCode.toLowerCase().contains("stand_up")) {
       _showAiExitDialog();
     }
   }
+  // // REPLACED: Instead of setState local list, we dispatch to Bloc
+  // void _handleVisualAction(String actionCode) {
+  //   String cleanAction = actionCode.replaceAll("//", "").replaceAll("_", " ");
+    
+  //   // 1. Send Action Message to Bloc
+  //   final actionMap = {
+  //     "id": "act_${DateTime.now().millisecondsSinceEpoch}_${actionCode.length}", 
+  //     "text": "* $cleanAction *",
+  //     "isMe": false,
+  //     "timestamp": DateTime.now(),
+  //     "isAction": true,
+  //     "isTyped": false, 
+  //   };
+  //   context.read<ChatBloc>().add(AddAiMessage(actionMap));
+
+  //   // 2. Trigger Local Animations
+  //   if (actionCode.contains("angry") || actionCode.contains("creepy")) {
+  //     _shakeController.forward(from: 0);
+  //   }
+  //   if (actionCode.contains("leave") || actionCode.contains("stand_up")) {
+  //     _showAiExitDialog();
+  //   }
+  // }
   
   // REPLACED: Instead of setState local list, we dispatch to Bloc
   void _dispatchMessageToBloc(String text, {required bool isMe}) {
@@ -519,37 +546,7 @@ Future<void> _handleSend(String rawText) async {
       context.read<ChatBloc>().add(SendMessage(widget.roomId, text));
     }
   }
-  // Future<void> _handleSend(String rawText) async {
-  //   final text = rawText.trim();
-  //   if (text.isEmpty) return;
 
-  //   _textController.clear();
-  //   _playSentSound(); 
-  //   _processTurn(text);
-
-  //   // B. Add User Message Locally (Dispatched to Bloc)
-  //   _dispatchMessageToBloc(text, isMe: true);
-
-  //   if (widget.isAi) {
-  //     _isAiTyping.value = true;
-  //     _actionDirector.interrupt(); 
-      
-  //     try {
-  //       final aiResponse = await _aiService.sendMessage(
-  //         message: text,
-  //         aiTargetGender: widget.aiGender,
-  //         userGender: widget.userGender, 
-  //         roomType: widget.roomType,
-  //       );
-  //       _actionDirector.processAiResponse(aiResponse);
-  //     } catch (e) {
-  //       _isAiTyping.value = false;
-  //       debugPrint("AI Failure: $e");
-  //     }
-  //   } else {
-  //     context.read<ChatBloc>().add(SendMessage(widget.roomId, text));
-  //   }
-  // }
 
   AppBar _buildAppBar(BuildContext context) {
     return AppBar(
