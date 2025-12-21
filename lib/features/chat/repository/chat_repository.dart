@@ -53,12 +53,13 @@ class ChatRepository {
   }
 
   // --- NEW: AI SESSION ARCHIVE (Step 3) ---
-  
-  /// Performs a "Single Write" to save the entire AI session to Firestore.
-  /// Returns TRUE if successful, FALSE if network failed.
+
   Future<bool> archiveAiSession({
     required String roomId,
     required String partnerName,
+    required String userGender,
+    required String userAge,
+    required String roomType,
     required List<Map<String, dynamic>> messages,
     required Map<String, double> stats,
     required int turnCount,
@@ -67,30 +68,33 @@ class ChatRepository {
     if (myUid == null) return false;
 
     try {
-      // Create a dedicated collection for analytics/history
-      // Structure: ai_chats_archived/{sessionId}
-      await _firestore.collection('ai_chats_archived').doc(roomId).set({
+      // --- THE SANITIZATION FIX ---
+      // We replace slashes with underscores. 
+      // Input: "sessions/ai_session_123" -> Output: "sessions_ai_session_123"
+      // This makes it a valid Document ID for Firestore.
+      final String safeId = roomId.replaceAll("/", "_");
+
+      await _firestore.collection('ai_chats_archived').doc(safeId).set({
+        // HEADER INFO (Metadata)
         'userId': myUid,
         'partnerName': partnerName,
-        'roomId': roomId,
+        'userGender': userGender,
+        'userAge': userAge,
+        'roomType': roomType,
+        
+        'roomId': roomId, // We keep the original ID inside the data for reference
         'archivedAt': FieldValue.serverTimestamp(),
         
-        // Save Stats
         'finalStats': {
           'vibe': stats['vibe'],
           'trust': stats['trust'],
           'tension': stats['tension'],
           'turns': turnCount,
         },
-
-        // Save Full History (Optimized: One Array)
-        // We limit to last 100 messages to respect Firestore document size limits (1MB)
         'messages': messages.take(100).map((m) {
-          // Convert DateTime to Firestore Timestamp for consistency
           final timestamp = m['timestamp'] is DateTime 
               ? Timestamp.fromDate(m['timestamp']) 
               : Timestamp.now();
-              
           return {
             'text': m['text'],
             'isMe': m['isMe'],
@@ -99,11 +103,10 @@ class ChatRepository {
           };
         }).toList(),
       });
-      
-      return true; // Sync Success
+      return true;
     } catch (e) {
-      print("Archive Failed (Offline?): $e");
-      return false; // Sync Failed (Will retry later)
+      print("Archive Failed: $e");
+      return false;
     }
   }
 }

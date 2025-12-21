@@ -26,13 +26,17 @@ class ChatScreen extends StatefulWidget {
   final String roomType; 
   final String aiGender; 
 
+  final String userGender;
+  final String userAge;
+
   const ChatScreen({
     super.key,
     required this.roomId,
     this.partnerName = "Stranger",
     this.isAi = false,
     this.roomType = "dating",
-    this.aiGender = "female",
+    this.aiGender = "female", this.userGender = "male", 
+    this.userAge = "22",
   });
 
   @override
@@ -46,22 +50,31 @@ class _ChatScreenState extends State<ChatScreen> {
     // we need to make sure this Bloc survives if we want to solve resize issues fully.
     // However, for Step 1 (Moving Logic), this connects the UI to the Bloc correctly.
     // In Step 2 (HydratedBloc), this same code will automatically load saved history.
-    return BlocProvider(
-      create: (context) {
-        final bloc = ChatBloc(ChatRepository());
-        if (widget.isAi) {
-          bloc.add(InitAiChat());
-        } else {
-          bloc.add(LoadMessages(widget.roomId));
-        }
-        return bloc;
-      },
+    // Inside build()
+return BlocProvider(
+    create: (context) {
+      final bloc = ChatBloc(ChatRepository());
+      if (widget.isAi) {
+        // UPDATED: StartAiSession handles the Room ID check and resets if needed
+        bloc.add(StartAiSession(
+          roomId: widget.roomId,
+          partnerName: widget.partnerName,
+          userGender: widget.userGender,
+          userAge: widget.userAge,
+          roomType: widget.roomType,
+        ));
+      } else {
+        bloc.add(LoadMessages(widget.roomId));
+      }
+      return bloc;
+    },
+  
       child: _ChatView(
         roomId: widget.roomId,
         partnerName: widget.partnerName,
         isAi: widget.isAi,
         roomType: widget.roomType,
-        aiGender: widget.aiGender,
+        aiGender: widget.aiGender, userGender: widget.userGender, userAge: widget.userAge,
       ),
     );
   }
@@ -73,6 +86,8 @@ class _ChatView extends StatefulWidget {
   final bool isAi;
   final String roomType;
   final String aiGender;
+  final String userGender;
+  final String userAge;
 
   const _ChatView({
     required this.roomId,
@@ -80,6 +95,8 @@ class _ChatView extends StatefulWidget {
     required this.isAi,
     required this.roomType,
     required this.aiGender,
+    required this.userGender, // ADD THIS
+    required this.userAge,
   });
 
   @override
@@ -472,7 +489,7 @@ class _ChatViewState extends State<_ChatView> with SingleTickerProviderStateMixi
     // B. Add User Message Locally (Dispatched to Bloc)
     _dispatchMessageToBloc(text, isMe: true);
 
-    if (widget.isAi) {
+if (widget.isAi) {
       _isAiTyping.value = true;
       _actionDirector.interrupt(); 
       
@@ -480,7 +497,7 @@ class _ChatViewState extends State<_ChatView> with SingleTickerProviderStateMixi
         final aiResponse = await _aiService.sendMessage(
           message: text,
           aiTargetGender: widget.aiGender,
-          userGender: "male", 
+          userGender: widget.userGender, 
           roomType: widget.roomType,
         );
         _actionDirector.processAiResponse(aiResponse);
