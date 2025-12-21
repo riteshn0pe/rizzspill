@@ -15,18 +15,18 @@ class VisualFxOverlay extends StatefulWidget {
 }
 
 class _VisualFxOverlayState extends State<VisualFxOverlay> with TickerProviderStateMixin {
-  // 1. FLASH CONTROLLER (Red/Green/Pink Solid)
+  // 1. FLASH CONTROLLER 
   late AnimationController _flashController;
   late Animation<double> _flashAnimation;
   Color _flashColor = Colors.transparent;
 
-  // 2. VIGNETTE CONTROLLER (Darken)
+  // 2. VIGNETTE CONTROLLER 
   late AnimationController _vignetteController;
   late Animation<double> _vignetteAnimation;
 
-  // 3. HEARTS CONTROLLER (Flying Icons)
-  late AnimationController _heartsController;
-  final List<Widget> _activeHearts = [];
+  // 3. PARTICLE CONTROLLER (Hearts & Anger)
+  late AnimationController _particleController;
+  final List<Widget> _activeParticles = [];
 
   StreamSubscription? _subscription;
 
@@ -46,28 +46,38 @@ class _VisualFxOverlayState extends State<VisualFxOverlay> with TickerProviderSt
     );
     _vignetteAnimation = CurvedAnimation(parent: _vignetteController, curve: Curves.easeIn);
 
-    // Setup Hearts (Runs for 2s)
-    _heartsController = AnimationController(
+    // Setup Particles (Runs for 2s)
+    _particleController = AnimationController(
       vsync: this, duration: const Duration(seconds: 2)
     );
     
-    _heartsController.addStatusListener((status) {
+    _particleController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        setState(() => _activeHearts.clear());
-        _heartsController.reset();
+        // Clear list only after animation finishes to prevent "glitch"
+        if (mounted) {
+          setState(() => _activeParticles.clear());
+          _particleController.reset();
+        }
       }
     });
 
     // LISTENER
+// LISTENER
     _subscription = widget.effectStream.listen((effect) {
       if (effect == 'romance_hearts') {
-        _triggerHearts();
+        // CASE 1: Standard Icons
+        _triggerParticles(icon: Icons.favorite, color: Colors.pinkAccent );
         _triggerFlash(Colors.pinkAccent.withOpacity(0.15));
       } 
       else if (effect == 'anger_pulse') {
+        // CASE 2: Using Emojis/Text! 
+        _triggerParticles(text: "😡"); 
+        // OR: _triggerParticles(icon: Icons.local_fire_department, color: Colors.orange);
         _triggerFlash(Colors.red.withOpacity(0.4));
       } 
       else if (effect == 'win_glow') {
+        // CASE 3: Adding Lightbulb (Scalability)
+        _triggerParticles(icon: Icons.lightbulb, color: Colors.yellowAccent , text: "😈");
         _triggerFlash(Colors.greenAccent.withOpacity(0.2));
       }
       else if (effect == 'shake') {
@@ -79,6 +89,7 @@ class _VisualFxOverlayState extends State<VisualFxOverlay> with TickerProviderSt
     });
   }
 
+  // ... (Keep _triggerFlash and _triggerVignette as they were) ...
   void _triggerFlash(Color color) {
     if (mounted) {
       setState(() => _flashColor = color);
@@ -96,35 +107,57 @@ class _VisualFxOverlayState extends State<VisualFxOverlay> with TickerProviderSt
     }
   }
 
-  void _triggerHearts() {
+// --- UPDATED TRIGGER METHOD ---
+  // Call this with an Icon OR Text. 
+  void _triggerParticles({IconData? icon, String? text, Color? color}) {
     if (mounted) {
-      // Generate 5-8 random hearts
-      _activeHearts.clear();
+      _activeParticles.clear();
       final random = Random();
+      
       for (int i = 0; i < 8; i++) {
-        _activeHearts.add(
+        double size = 24 + random.nextInt(20).toDouble();
+        
+        // Determine what to render based on inputs
+        Widget content;
+        if (text != null) {
+          // Render Text/Emoji
+          content = Text(
+            text, 
+            style: TextStyle(fontSize: size) // No color needed for emojis usually
+          );
+        } else {
+          // Render Icon (Default)
+          content = Icon(
+            icon ?? Icons.favorite, // Fallback
+            color: color ?? Colors.pink, 
+            size: size
+          );
+        }
+
+        _activeParticles.add(
           Positioned(
-            left: 50 + random.nextInt(300).toDouble(), // Random X
-            bottom: 100, // Start near chat input
-            child: _FlyingHeart(
-              controller: _heartsController,
-              delay: i * 0.1, // Staggered start
-              size: 20 + random.nextInt(20).toDouble(),
+            left: 50 + random.nextInt(250).toDouble(),
+            bottom: 150,
+            child: _FlyingParticle(
+              controller: _particleController,
+              delay: i * 0.1, 
+              size: size,
+              child: content, // <--- Pass the widget here
             ),
           )
         );
       }
-      setState(() {}); // Rebuild to show hearts
-      _heartsController.forward(from: 0);
+      setState(() {}); 
+      _particleController.forward(from: 0);
     }
   }
-
+  
   @override
   void dispose() {
     _subscription?.cancel();
     _flashController.dispose();
     _vignetteController.dispose();
-    _heartsController.dispose();
+    _particleController.dispose();
     super.dispose();
   }
 
@@ -144,8 +177,12 @@ class _VisualFxOverlayState extends State<VisualFxOverlay> with TickerProviderSt
             },
           ),
 
-          // 2. HEARTS LAYER (Only visible when active)
-          ..._activeHearts,
+          // 2. PARTICLE LAYER (Hearts/Fire)
+          // We wrap this in a Stack to ensure Positioned widgets work
+          Stack(
+            clipBehavior: Clip.none, // Allow flying off-screen without error
+            children: _activeParticles,
+          ),
 
           // 3. VIGNETTE LAYER
           AnimatedBuilder(
@@ -171,6 +208,372 @@ class _VisualFxOverlayState extends State<VisualFxOverlay> with TickerProviderSt
     );
   }
 }
+
+
+// --- GENERIC FLYING PARTICLE WIDGET (FIXED & ROBUST) ---
+class _FlyingParticle extends StatelessWidget {
+  final AnimationController controller;
+  final double delay;
+  final double size;
+  final Widget child; 
+
+  const _FlyingParticle({
+    required this.controller, 
+    required this.delay, 
+    required this.size,
+    required this.child, 
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // SAFETY CHECK 1: Ensure delay is valid. 
+    // If delay is >= 1.0, the animation effectively never starts or is instant.
+    if (delay >= 1.0) return const SizedBox.shrink();
+
+    // 1. DYNAMIC REMAINING TIME
+    // Instead of assuming we have 0.4s left, we calculate exactly what's left.
+    final double remainingTime = 1.0 - delay;
+
+    // 2. FLY UP ANIMATION (Uses all remaining time)
+    final Animation<double> flyUp = Tween<double>(begin: 0, end: 300).animate(
+      CurvedAnimation(
+        parent: controller,
+        // Start at 'delay', fly until the end (1.0)
+        curve: Interval(delay, 1.0, curve: Curves.easeOut),
+      ),
+    );
+
+    // 3. FADE OUT ANIMATION (Calculated relative to remaining time)
+    // Old Crashy Logic: delay + 0.4
+    // New Robust Logic: Start fading when 50% of the remaining life is done.
+    final double fadeStart = delay + (remainingTime * 0.5);
+    
+    // Safety clamp: Ensure fadeStart is strictly less than 1.0
+    // If floating point math makes it 1.0, nudge it back slightly.
+    final double safeFadeStart = fadeStart >= 1.0 ? 0.99 : fadeStart;
+
+    final Animation<double> fade = Tween<double>(begin: 1, end: 0).animate(
+      CurvedAnimation(
+        parent: controller,
+        curve: Interval(safeFadeStart, 1.0, curve: Curves.easeIn),
+      ),
+    );
+
+    // 4. SCALE ANIMATION (Pop In)
+    // Old Crashy Logic: delay + 0.2
+    // New Robust Logic: Ensure end time never exceeds 1.0
+    final double scaleEnd = (delay + 0.2).clamp(delay + 0.01, 1.0);
+
+    final Animation<double> scale = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(
+        parent: controller,
+        curve: Interval(delay, scaleEnd, curve: Curves.elasticOut),
+      ),
+    );
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, childWidget) {
+        // Optimization: Don't render invisible items
+        if (controller.value < delay) return const SizedBox.shrink();
+
+        return Transform.translate(
+          offset: Offset(0, -flyUp.value), 
+          child: Opacity(
+            opacity: fade.value,
+            child: Transform.scale(
+              scale: scale.value,
+              child: child, 
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// --- GENERIC FLYING PARTICLE WIDGET (UPDATED) ---
+// Now accepts ANY widget (Icon, Text, Emoji, Image)
+// class _FlyingParticle extends StatelessWidget {
+//   final AnimationController controller;
+//   final double delay;
+//   final double size;
+//   final Widget child; // <--- CHANGED FROM IconData/Color TO Widget
+
+//   const _FlyingParticle({
+//     required this.controller, 
+//     required this.delay, 
+//     required this.size,
+//     required this.child, // <--- CHANGED
+//   });
+
+//   @override
+//   Widget build(BuildContext context) {
+//     // Fly Up Animation
+//     final Animation<double> flyUp = Tween<double>(begin: 0, end: 300).animate(
+//       CurvedAnimation(
+//         parent: controller,
+//         curve: Interval(delay, 1.0, curve: Curves.easeOut),
+//       ),
+//     );
+
+//     // Fade Out Animation
+//     final Animation<double> fade = Tween<double>(begin: 1, end: 0).animate(
+//       CurvedAnimation(
+//         parent: controller,
+//         curve: Interval(delay + 0.4, 1.0, curve: Curves.easeIn),
+//       ),
+//     );
+
+//     // Scale Animation (Pop in)
+//     final Animation<double> scale = Tween<double>(begin: 0, end: 1).animate(
+//       CurvedAnimation(
+//         parent: controller,
+//         curve: Interval(delay, delay + 0.2, curve: Curves.elasticOut),
+//       ),
+//     );
+
+//     return AnimatedBuilder(
+//       animation: controller,
+//       builder: (context, childWidget) {
+//         if (controller.value < delay) return const SizedBox.shrink();
+
+//         return Transform.translate(
+//           offset: Offset(0, -flyUp.value), 
+//           child: Opacity(
+//             opacity: fade.value,
+//             child: Transform.scale(
+//               scale: scale.value,
+//               child: child, // <--- Renders whatever you passed (Icon or Text)
+//             ),
+//           ),
+//         );
+//       },
+//     );
+//   }
+// }
+
+
+
+// --- GENERIC FLYING PARTICLE WIDGET ---
+// class _FlyingParticle extends StatelessWidget {
+//   final AnimationController controller;
+//   final double delay;
+//   final double size;
+//   final IconData icon;
+//   final Color color;
+
+//   const _FlyingParticle({
+//     required this.controller, 
+//     required this.delay, 
+//     required this.size,
+//     required this.icon,
+//     required this.color,
+//   });
+
+//   @override
+//   Widget build(BuildContext context) {
+//     // Fly Up Animation
+//     final Animation<double> flyUp = Tween<double>(begin: 0, end: 300).animate(
+//       CurvedAnimation(
+//         parent: controller,
+//         curve: Interval(delay, 1.0, curve: Curves.easeOut),
+//       ),
+//     );
+
+//     // Fade Out Animation
+//     final Animation<double> fade = Tween<double>(begin: 1, end: 0).animate(
+//       CurvedAnimation(
+//         parent: controller,
+//         curve: Interval(delay + 0.4, 1.0, curve: Curves.easeIn),
+//       ),
+//     );
+
+//     // Scale Animation (Pop in)
+//     final Animation<double> scale = Tween<double>(begin: 0, end: 1).animate(
+//       CurvedAnimation(
+//         parent: controller,
+//         curve: Interval(delay, delay + 0.2, curve: Curves.elasticOut),
+//       ),
+//     );
+
+//     return AnimatedBuilder(
+//       animation: controller,
+//       builder: (context, child) {
+//         if (controller.value < delay) return const SizedBox.shrink();
+
+//         return Transform.translate(
+//           offset: Offset(0, -flyUp.value), 
+//           child: Opacity(
+//             opacity: fade.value,
+//             child: Transform.scale(
+//               scale: scale.value,
+//               child: Icon(icon, color: color, size: size),
+//             ),
+//           ),
+//         );
+//       },
+//     );
+//   }
+// }
+
+// class _VisualFxOverlayState extends State<VisualFxOverlay> with TickerProviderStateMixin {
+//   // 1. FLASH CONTROLLER (Red/Green/Pink Solid)
+//   late AnimationController _flashController;
+//   late Animation<double> _flashAnimation;
+//   Color _flashColor = Colors.transparent;
+
+//   // 2. VIGNETTE CONTROLLER (Darken)
+//   late AnimationController _vignetteController;
+//   late Animation<double> _vignetteAnimation;
+
+//   // 3. HEARTS CONTROLLER (Flying Icons)
+//   late AnimationController _heartsController;
+//   final List<Widget> _activeHearts = [];
+
+//   StreamSubscription? _subscription;
+
+//   @override
+//   void initState() {
+//     super.initState();
+
+//     // Setup Flash
+//     _flashController = AnimationController(
+//       vsync: this, duration: const Duration(milliseconds: 1500)
+//     );
+//     _flashAnimation = CurvedAnimation(parent: _flashController, curve: Curves.easeInOut);
+
+//     // Setup Vignette
+//     _vignetteController = AnimationController(
+//       vsync: this, duration: const Duration(seconds: 3)
+//     );
+//     _vignetteAnimation = CurvedAnimation(parent: _vignetteController, curve: Curves.easeIn);
+
+//     // Setup Hearts (Runs for 2s)
+//     _heartsController = AnimationController(
+//       vsync: this, duration: const Duration(seconds: 2)
+//     );
+    
+//     _heartsController.addStatusListener((status) {
+//       if (status == AnimationStatus.completed) {
+//         setState(() => _activeHearts.clear());
+//         _heartsController.reset();
+//       }
+//     });
+
+//     // LISTENER
+//     _subscription = widget.effectStream.listen((effect) {
+//       if (effect == 'romance_hearts') {
+//         _triggerHearts();
+//         _triggerFlash(Colors.pinkAccent.withOpacity(0.15));
+//       } 
+//       else if (effect == 'anger_pulse') {
+//         _triggerFlash(Colors.red.withOpacity(0.4));
+//       } 
+//       else if (effect == 'win_glow') {
+//         _triggerFlash(Colors.greenAccent.withOpacity(0.2));
+//       }
+//       else if (effect == 'shake') {
+//         _triggerFlash(Colors.redAccent.withOpacity(0.3)); 
+//       } 
+//       else if (effect == 'focus_vignette') {
+//         _triggerVignette();
+//       }
+//     });
+//   }
+
+//   void _triggerFlash(Color color) {
+//     if (mounted) {
+//       setState(() => _flashColor = color);
+//       _flashController.forward(from: 0).then((_) => _flashController.reverse());
+//     }
+//   }
+
+//   void _triggerVignette() {
+//     if (mounted) {
+//       _vignetteController.forward(from: 0).then((_) {
+//         Future.delayed(const Duration(seconds: 2), () {
+//           if (mounted) _vignetteController.reverse();
+//         });
+//       });
+//     }
+//   }
+
+//   void _triggerHearts() {
+//     if (mounted) {
+//       // Generate 5-8 random hearts
+//       _activeHearts.clear();
+//       final random = Random();
+//       for (int i = 0; i < 8; i++) {
+//         _activeHearts.add(
+//           Positioned(
+//             left: 50 + random.nextInt(300).toDouble(), // Random X
+//             bottom: 100, // Start near chat input
+//             child: _FlyingHeart(
+//               controller: _heartsController,
+//               delay: i * 0.1, // Staggered start
+//               size: 20 + random.nextInt(20).toDouble(),
+//             ),
+//           )
+//         );
+//       }
+//       setState(() {}); // Rebuild to show hearts
+//       _heartsController.forward(from: 0);
+//     }
+//   }
+
+//   @override
+//   void dispose() {
+//     _subscription?.cancel();
+//     _flashController.dispose();
+//     _vignetteController.dispose();
+//     _heartsController.dispose();
+//     super.dispose();
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return IgnorePointer(
+//       child: Stack(
+//         fit: StackFit.expand,
+//         children: [
+//           // 1. FLASH LAYER
+//           AnimatedBuilder(
+//             animation: _flashAnimation,
+//             builder: (context, child) {
+//               return Container(
+//                 color: _flashColor.withOpacity(_flashAnimation.value * _flashColor.opacity),
+//               );
+//             },
+//           ),
+
+//           // 2. HEARTS LAYER (Only visible when active)
+//           ..._activeHearts,
+
+//           // 3. VIGNETTE LAYER
+//           AnimatedBuilder(
+//             animation: _vignetteAnimation,
+//             builder: (context, child) {
+//               return Opacity(
+//                 opacity: _vignetteAnimation.value,
+//                 child: Container(
+//                   decoration: const BoxDecoration(
+//                     gradient: RadialGradient(
+//                       center: Alignment.center,
+//                       radius: 0.85,
+//                       colors: [Colors.transparent, Colors.black],
+//                       stops: [0.3, 1.0],
+//                     ),
+//                   ),
+//                 ),
+//               );
+//             },
+//           ),
+//         ],
+//       ),
+//     );
+//   }
+// }
 
 // Helper Widget for a single flying heart
 class _FlyingHeart extends StatelessWidget {

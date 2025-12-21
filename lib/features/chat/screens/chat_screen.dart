@@ -427,10 +427,27 @@ void _handleVisualAction(String actionCode) {
       );
     }
 
-    // 2. HUMAN CHAT LOGIC (Unchanged, already using Bloc)
+    
+    // 2. HUMAN CHAT LOGIC
     return BlocConsumer<ChatBloc, ChatState>(
       listener: (context, state) {
-        if (state is ChatEnded) Navigator.pop(context);
+        if (state is ChatEnded) {
+          Navigator.pop(context);
+          return;
+        }
+        
+        // --- VISUAL FX TRIGGER FOR RECEIVER ---
+        // This ensures that when the partner sends a romantic/angry message, 
+        // YOUR screen reacts to it.
+        if (state is ChatLoaded && state.messages.isNotEmpty) {
+          final latestMsg = state.messages.first;
+          
+          // Only analyze if the message is NOT from me (Partner sent it)
+          // (My own messages are handled instantly in _handleSend for zero latency)
+          if (latestMsg.senderId != myUid) {
+            _actionDirector.analyzeTextForVisuals(latestMsg.text);
+          }
+        }
       },
       builder: (context, state) {
         if (state is ChatLoaded) {
@@ -446,9 +463,10 @@ void _handleVisualAction(String actionCode) {
                   final isMe = msg.senderId == myUid;
 
                   return TypewriterChatBubble(
-                    key: ValueKey(msg.id),
+                    key: ValueKey(msg.id), // Ensure your ChatMessage model has a unique 'id'
                     text: msg.text,
                     isMe: isMe,
+                    // If it's me, it's already typed. If it's partner, check the flag.
                     isAlreadyTyped: isMe ? true : (msg.isTyped ?? false),
                     onFinished: () => msg.isTyped = true,
                     startTime: msg.timestamp, 
@@ -457,10 +475,18 @@ void _handleVisualAction(String actionCode) {
                 },
               ),
               
+              // --- VISUAL FX OVERLAY ---
+              // This is CRITICAL. Without this here, the triggers above will fire
+              // but nothing will show up on screen.
+              VisualFxOverlay(effectStream: _actionDirector.visualEffectStream),
+              
+              // Inactivity Monitor for Humans
               Positioned(
                 bottom: 0, left: 0, right: 0,
                 child: InactivityMonitor(
-                  lastActivityTime: state.messages.isNotEmpty ? state.messages.first.timestamp : DateTime.now(),
+                  lastActivityTime: state.messages.isNotEmpty 
+                      ? state.messages.first.timestamp 
+                      : DateTime.now(),
                   onTimeout: () => context.read<ChatBloc>().add(EndChat(widget.roomId)),
                 ),
               ),
@@ -504,48 +530,52 @@ void _handleVisualAction(String actionCode) {
       ),
     );
   }
-
 Future<void> _handleSend(String rawText) async {
-    final text = rawText.trim();
-    if (text.isEmpty) return;
+  final text = rawText.trim();
+  if (text.isEmpty) return;
 
-    _textController.clear();
-    _playSentSound(); 
-    _processTurn(text);
+  _textController.clear();
+  _playSentSound(); 
+  _processTurn(text);
 
-    // B. Add User Message Locally (Dispatched to Bloc)
-    _dispatchMessageToBloc(text, isMe: true);
+  // 1. TRIGGER VISUALS IMMEDIATELY (Responsiveness)
+  // This analyzes the user's input words right now
+  _actionDirector.analyzeTextForVisuals(text);
 
-    if (widget.isAi) {
-      _isAiTyping.value = true;
-      _actionDirector.interrupt(); 
-      
-      // GET HISTORY FROM BLOC STATE
-      // We need the current list of messages to send as context.
-      List<Map<String, dynamic>> currentHistory = [];
-      final currentState = context.read<ChatBloc>().state;
-      if (currentState is AiChatLoaded) {
-        currentHistory = currentState.messages;
-      }
+  // 2. Add User Message Locally
+  _dispatchMessageToBloc(text, isMe: true);
 
-      try {
-        final aiResponse = await _aiService.sendMessage(
-          message: text,
-          previousMessages: currentHistory, // <--- PASSING CONTEXT HERE
-          aiTargetGender: widget.aiGender,
-          userGender: widget.userGender, 
-          roomType: widget.roomType,
-          userAge: widget.userAge,
-        );
-        _actionDirector.processAiResponse(aiResponse);
-      } catch (e) {
-        _isAiTyping.value = false;
-        debugPrint("AI Failure: $e");
-      }
-    } else {
-      context.read<ChatBloc>().add(SendMessage(widget.roomId, text));
+  if (widget.isAi) {
+    _isAiTyping.value = true;
+    _actionDirector.interrupt(); 
+    
+    List<Map<String, dynamic>> currentHistory = [];
+    final currentState = context.read<ChatBloc>().state;
+    if (currentState is AiChatLoaded) {
+      currentHistory = currentState.messages;
     }
+
+    try {
+      final aiResponse = await _aiService.sendMessage(
+        message: text,
+        previousMessages: currentHistory,
+        aiTargetGender: widget.aiGender,
+        userGender: widget.userGender, 
+        roomType: widget.roomType,
+        userAge: widget.userAge,
+      );
+      
+      // 3. PROCESS AI RESPONSE (This handles AI text + AI actions)
+      _actionDirector.processAiResponse(aiResponse);
+      
+    } catch (e) {
+      _isAiTyping.value = false;
+      debugPrint("AI Failure: $e");
+    }
+  } else {
+    context.read<ChatBloc>().add(SendMessage(widget.roomId, text));
   }
+}
 
 
   AppBar _buildAppBar(BuildContext context) {
