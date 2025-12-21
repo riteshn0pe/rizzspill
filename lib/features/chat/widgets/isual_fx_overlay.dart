@@ -15,6 +15,18 @@ class VisualFxOverlay extends StatefulWidget {
 }
 
 class _VisualFxOverlayState extends State<VisualFxOverlay> with TickerProviderStateMixin {
+
+
+  // --- CUSTOM EMOTION PALETTE ---
+  static const _loveColor = Color(0xFFFFC1CC);     // Soft Pink
+  static const _angerColor = Color(0xFFFF4D4D);    // Intense Red
+  static const _naughtyColor = Color(0xFFFF69B4);  // Hot Pink
+  static const _winColor = Color(0xFFFFD700);      // Gold
+  static const _sadColor = Color(0xFF6C7B95);      // Blue-Grey
+  static const _laughColor = Color(0xFFFFFF4D);    // Bright Yellow
+
+
+
   // 1. FLASH CONTROLLER 
   late AnimationController _flashController;
   late Animation<double> _flashAnimation;
@@ -64,22 +76,41 @@ class _VisualFxOverlayState extends State<VisualFxOverlay> with TickerProviderSt
     // LISTENER
 // LISTENER
     _subscription = widget.effectStream.listen((effect) {
-      if (effect == 'romance_hearts') {
-        // CASE 1: Standard Icons
-        _triggerParticles(icon: Icons.favorite, color: Colors.pinkAccent );
-        _triggerFlash(Colors.pinkAccent.withOpacity(0.15));
-      } 
-      else if (effect == 'anger_pulse') {
-        // CASE 2: Using Emojis/Text! 
-        _triggerParticles(text: "😡"); 
-        // OR: _triggerParticles(icon: Icons.local_fire_department, color: Colors.orange);
-        _triggerFlash(Colors.red.withOpacity(0.4));
-      } 
-      else if (effect == 'win_glow') {
-        // CASE 3: Adding Lightbulb (Scalability)
-        _triggerParticles(icon: Icons.lightbulb, color: Colors.yellowAccent , text: "😈");
-        _triggerFlash(Colors.greenAccent.withOpacity(0.2));
-      }
+      // 1. LOVE (Soft Pink) – Warm, affectionate, romantic
+if (effect == 'romance_pulse') {
+  _triggerParticles(text: "🥰❤️");  // Smiling face with hearts + red heart
+  _triggerFlash(_loveColor.withOpacity(0.2));
+}
+
+// 2. NAUGHTY / FLIRTY (Hot Pink/Magenta) – Sexy, playful, seductive
+else if (effect == 'naughty_pulse') {
+  _triggerParticles(text: "🥵🫦");  // Devilish smirk + kiss mark
+  _triggerFlash(_naughtyColor.withOpacity(0.25));
+}
+
+// 3. ANGER / RAGE (Intense Red) – Aggressive, furious
+else if (effect == 'anger_pulse') {
+  _triggerParticles(text: "😡🖕");  // Cursing face + anger symbol
+  _triggerFlash(_angerColor.withOpacity(0.4));
+}
+
+// 4. WIN / VICTORY (Gold) – Triumphant, successful
+else if (effect == 'win_pulse') {
+  _triggerParticles(text: "🏆✨");  // Trophy + sparkle
+  _triggerFlash(_winColor.withOpacity(0.25));
+}
+
+// 5. SAD / HEARTBROKEN (Blue-Grey) – Melancholy, emotional
+else if (effect == 'sad_pulse') {
+  _triggerParticles(text: "💔😢");  // Broken heart + crying face
+  _triggerFlash(_sadColor.withOpacity(0.3));
+}
+
+// 6. LAUGH / FUNNY (Bright Yellow) – Hilarious, joyful
+else if (effect == 'laugh_pulse') {
+  _triggerParticles(text: "😂🤣");  // Laughing tears + rolling on floor laughing
+  _triggerFlash(_laughColor.withOpacity(0.2));
+}
       else if (effect == 'shake') {
         _triggerFlash(Colors.redAccent.withOpacity(0.3)); 
       } 
