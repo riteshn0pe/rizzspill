@@ -3,11 +3,20 @@ abstract class MatchEvent {}
 // CHANGE 1: Remove all arguments. 
 // The BLoC now fetches profile data internally, so the UI just says "Start".
 class StartMatching extends MatchEvent {
-  final String roomType; // Add this field
+  // CRITICAL FIX: No default value. Must be provided explicitly.
+  final String roomType; 
 
-  // Constructor with a default value to prevent null issues
-  StartMatching(String s, {this.roomType = 'dating'});
+  StartMatching({required this.roomType});
+
+  @override
+  List<Object> get props => [roomType];
 }
+// class StartMatching extends MatchEvent {
+//   final String roomType; // Add this field
+
+//   // Constructor with a default value to prevent null issues
+//   StartMatching(String s, {this.roomType = 'dating'});
+// }
 
 // Internal event triggered by the timer
 // CHANGE 2: Keep arguments here! 

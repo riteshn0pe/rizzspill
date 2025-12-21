@@ -1,5 +1,7 @@
+
 import 'package:flutter/material.dart';
 import 'package:virtual_dating/features/chat/widgets/typing_sound_controller.dart'; 
+import 'package:characters/characters.dart'; // <--- CRITICAL IMPORT
 
 class TypewriterChatBubble extends StatefulWidget {
   final String text;
@@ -41,18 +43,19 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
     TypingSoundController().init();
 
     // 1. Calculate how long the typing SHOULD take
-    final totalMilliseconds = 60 * widget.text.length;
+    // FIX: Use .characters.length (Grapheme count) instead of .length
+    final int safeLength = widget.text.characters.length;
+    final totalMilliseconds = 60 * safeLength;
     final duration = Duration(milliseconds: totalMilliseconds);
     
     _controller = AnimationController(vsync: this, duration: duration);
     
-    _characterCount = StepTween(begin: 0, end: widget.text.length).animate(
+    // FIX: StepTween now counts real characters, preventing emoji splitting
+    _characterCount = StepTween(begin: 0, end: safeLength).animate(
       CurvedAnimation(parent: _controller, curve: Curves.linear),
     );
 
-    // 2. ATTACH LISTENER FIRST (THE FIX)
-    // We attach this BEFORE calling forward() logic below.
-    // This ensures the sound controller catches the 'start' signal immediately.
+    // 2. ATTACH LISTENER FIRST
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.forward) {
         if (!widget.isMe && !widget.isAlreadyTyped) {
@@ -74,15 +77,16 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
       final elapsed = DateTime.now().difference(widget.startTime).inMilliseconds;
       
       // Calculate percentage (0.0 to 1.0)
-      final double progress = (elapsed / totalMilliseconds).clamp(0.0, 1.0);
+      final double progress = totalMilliseconds > 0 
+          ? (elapsed / totalMilliseconds).clamp(0.0, 1.0)
+          : 1.0; // Handle empty strings safely
       
       // Resume exactly from that percentage
       _controller.value = progress;
       
       if (progress < 1.0) {
-        _controller.forward(); // The listener above is now ready to catch this!
+        _controller.forward();
       } else {
-        // If enough time passed that it should be done, mark it done immediately
         widget.onFinished();
       }
     }
@@ -91,9 +95,9 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
   @override
   void didUpdateWidget(TypewriterChatBubble oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // If the widget updates but it's the same message, DO NOT reset.
     if (widget.text != oldWidget.text) {
-      _controller.duration = Duration(milliseconds: 60 * widget.text.length);
+      // FIX: Use .characters.length here too
+      _controller.duration = Duration(milliseconds: 60 * widget.text.characters.length);
       if (widget.isAlreadyTyped || widget.isMe) {
         _controller.value = 1.0;
         TypingSoundController().stopTyping();
@@ -146,9 +150,13 @@ class _TypewriterChatBubbleState extends State<TypewriterChatBubble>
     return AnimatedBuilder(
       animation: _characterCount,
       builder: (context, child) {
-        final visibleChars = _characterCount.value.clamp(0, widget.text.length);
+        // FIX: Safe Character Slicing
+        // .characters handles Emojis properly so we don't slice them in half
+        final safeLength = widget.text.characters.length;
+        final visibleChars = _characterCount.value.clamp(0, safeLength);
+        
         return Text(
-          widget.text.substring(0, visibleChars), 
+          widget.text.characters.take(visibleChars).toString(), 
           style: _textStyle()
         );
       },

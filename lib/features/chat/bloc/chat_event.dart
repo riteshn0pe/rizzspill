@@ -42,18 +42,21 @@ class StartAiSession extends ChatEvent {
   });
 }
 
+// chat_event.dart
+
+// ... (Other events like LoadMessages, SendMessage, StartAiSession remain unchanged) ...
+
 class AddAiMessage extends ChatEvent {
   final Map<String, dynamic> message;
   AddAiMessage(this.message);
 }
 
+// UPDATED: Accepts the full stats map
 class UpdateAiStats extends ChatEvent {
-  final double? vibe;
-  final double? trust;
-  final double? tension;
+  final Map<String, dynamic> newStats; // <--- The missing parameter
   final int? turn;
   
-  UpdateAiStats({this.vibe, this.trust, this.tension, this.turn});
+  UpdateAiStats({required this.newStats, this.turn});
 }
 
 // abstract class ChatEvent {}

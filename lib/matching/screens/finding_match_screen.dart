@@ -13,21 +13,32 @@ class FindingMatchScreen extends StatefulWidget {
 }
 
 class _FindingMatchScreenState extends State<FindingMatchScreen> {
+  // Flag to prevent re-triggering logic when dependencies change unnecessarily
+  bool _hasInitialized = false;
 
-  @override
-  void initState() {
-    super.initState();
-    
-    // SMART RESUME LOGIC:
-    // We check the Global Bloc's state before starting a new search.
-    // If we are already searching (e.g. returning from minimize), we do NOT fire StartMatching again.
-    final state = context.read<MatchBloc>().state;
-    
-    if (state is! MatchSearching && state is! MatchFound) {
-      context.read<MatchBloc>().add(StartMatching("dating")); 
+@override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (!_hasInitialized) {
+      _hasInitialized = true;
+      
+      // 1. CAPTURE THE ROOM TYPE
+      // We retrieve the argument passed via Navigator.pushNamed in Home Screen.
+      // If null, we default to "dating" to prevent crashes.
+      final args = ModalRoute.of(context)?.settings.arguments;
+      final String requestedRoomType = (args is String) ? args : "dating";
+
+      // 2. SMART RESUME LOGIC
+      // Check the global state. If not already searching/found, start the correct search.
+      final state = context.read<MatchBloc>().state;
+      
+      if (state is! MatchSearching && state is! MatchFound) {
+        // FIX: Use 'roomType:' named parameter to match the updated Event signature
+        context.read<MatchBloc>().add(StartMatching(roomType: requestedRoomType)); 
+      }
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -45,11 +56,10 @@ class _FindingMatchScreenState extends State<FindingMatchScreen> {
                 roomId: state.roomId,
                 isAi: state.isAi,
                 partnerName: state.partnerName,
-                roomType: state.roomType,
+                roomType: state.roomType, // This is now correct from MatchBloc!
                 aiGender: state.aiGender ?? 'female',
                 
                 // PASSING HEADERS (Step 4)
-                // Accessing these from MatchState ensures ChatBloc can archive properly
                 userGender: state.userGender ?? "male", 
                 userAge: state.userAge ?? "22",         
               );
@@ -80,8 +90,10 @@ class _FindingMatchScreenState extends State<FindingMatchScreen> {
                     const SizedBox(height: 30),
                     ElevatedButton(
                       onPressed: () {
-                        context.read<MatchBloc>().add(StartMatching("dating"));
-                      },
+    final args = ModalRoute.of(context)?.settings.arguments;
+    final String retryRoom = (args is String) ? args : "dating";
+    context.read<MatchBloc>().add(StartMatching(roomType: retryRoom));
+},
                       child: const Text("Retry"),
                     )
                   ],

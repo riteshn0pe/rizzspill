@@ -81,7 +81,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                           icon: FontAwesomeIcons.heart,
                           color: Colors.pinkAccent,
                           delay: 0,
-                          roomType: "debate"
+                          roomType: "dating"
                         ),
 
                         _buildCategoryCard(
@@ -98,7 +98,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                           
                           title: "ELITE DEBATE",
                           subtitle: "Win with logic & pressure",
-                          icon: FontAwesomeIcons.scaleBalanced,
+                          icon: FontAwesomeIcons.cross,
                           color: Colors.blueAccent,
                           delay: 0.2,
                           roomType: "debate"
@@ -109,7 +109,7 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
                           icon: FontAwesomeIcons.ghost,
                           color: Colors.greenAccent,
                           delay: 0.4,
-                          roomType: "random chat"
+                          roomType: "random"
                         ),
                       ],
                     ),
@@ -154,31 +154,33 @@ class _MyHomePageState extends State<MyHomePage> with SingleTickerProviderStateM
     );
   }
 
-  Widget _buildCategoryCard({
+Widget _buildCategoryCard({
     required String title,
     required String subtitle,
     required IconData icon,
     required Color color,
     required double delay,
-    required String roomType, // NEW: Pass 'dating', 'debate', or 'random'
+    required String roomType, // This variable holds "debate", "random", etc.
   }) {
     return AnimatedBuilder(
       animation: _floatController,
       builder: (context, child) {
-        // Subtle floating movement logic
         double offset = (delay * 10) + (_floatController.value * 10);
         return Transform.translate(
           offset: Offset(0, offset),
           
           child: GestureDetector(
-            
             onTap: () {
-                // 1. Dispatch the event with the room type
-                context.read<MatchBloc>().add(StartMatching("dating"));
-                
-                // 2. Navigate to your finding match screen
-                Navigator.pushNamed(context, '/matching');
-              },
+    // 1. Dispatch event (for immediate response)
+    context.read<MatchBloc>().add(StartMatching(roomType : roomType));
+    
+    // 2. Pass argument (for the Finding Screen to verify/retry correctly)
+    Navigator.pushNamed(
+      context, 
+      '/matching', 
+      arguments: roomType // <--- ADD THIS
+    );
+},
             child: Container(
               margin: const EdgeInsets.only(bottom: 24),
               padding: const EdgeInsets.all(24),

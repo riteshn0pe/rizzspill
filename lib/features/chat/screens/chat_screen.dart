@@ -131,50 +131,78 @@ class _ChatViewState extends State<_ChatView> with SingleTickerProviderStateMixi
 
   late AnimationController _shakeController;
 
-  @override
-  void initState() {
-    super.initState();
-    _initAudio();
-    
-    _shakeController = AnimationController(
-      duration: const Duration(milliseconds: 500), 
-      vsync: this
-    );
+@override
+void initState() {
+  super.initState();
+  _initAudio();
+  
+  _shakeController = AnimationController(
+    duration: const Duration(milliseconds: 500), 
+    vsync: this
+  );
 
-    // Visual FX Listener
-    _actionDirector.visualEffectStream.listen((effect) {
-      if (effect == 'shake') {
-        _shakeController.forward(from: 0);
+  // Visual FX Listener
+  _actionDirector.visualEffectStream.listen((effect) {
+    if (effect == 'shake') {
+      _shakeController.forward(from: 0);
+    }
+  });
+
+  // AI Logic Listener
+  if (widget.isAi) {
+    _actionDirector.actionStream.listen((event) {
+      if (!mounted) return;
+
+      // 1. Handle Text Arrival
+      if (event.text != null) {
+        _isAiTyping.value = false; 
+        _dispatchMessageToBloc(event.text!, isMe: false);
+      }
+
+      // 2. Handle Stats (FIXED: Source of Truth is the BLOC STATE, not just widget)
+      // We grab the current room type from the Bloc state to ensure we match what the backend knows.
+      final currentState = context.read<ChatBloc>().state;
+      String currentRoomType = widget.roomType; // Default to widget param
+      
+      if (currentState is AiChatLoaded) {
+        currentRoomType = currentState.roomType; // Override with authoritative state if available
+      }
+
+      Map<String, dynamic> newStats = {};
+
+      // If the event has specific values, map them to the correct keys
+      if (event.vibe != null) {
+          if (currentRoomType == 'debate') newStats['your_edge'] = event.vibe;
+          else if (currentRoomType == 'random') newStats['chaos'] = event.vibe;
+          else if (currentRoomType == 'confession') newStats['vulnerability'] = event.vibe;
+          else newStats['chemistry'] = event.vibe; // Default to Dating
+      }
+
+      if (event.trust != null) {
+          if (currentRoomType == 'debate') newStats['their_edge'] = event.trust;
+          else if (currentRoomType == 'random') newStats['laugh'] = event.trust;
+          else if (currentRoomType == 'confession') newStats['connection'] = event.trust;
+          else newStats['trust'] = event.trust; 
+      }
+
+      if (event.tension != null) {
+          if (currentRoomType == 'random') newStats['weirdness'] = event.tension;
+          else if (currentRoomType == 'confession') newStats['reciprocity'] = event.tension;
+          else newStats['tension'] = event.tension; // Dating & Debate (if used)
+      }
+
+      // Only dispatch if we actually have data (prevents overwriting with zeros)
+      if (newStats.isNotEmpty) {
+          context.read<ChatBloc>().add(UpdateAiStats(newStats: newStats));
+      }
+
+      // 3. Handle Visual Actions
+      if (event.action != null) {
+        _handleVisualAction(event.action!);
       }
     });
-
-    // AI Logic Listener
-    if (widget.isAi) {
-      _actionDirector.actionStream.listen((event) {
-        if (!mounted) return;
-
-        // 1. Handle Text Arrival
-        if (event.text != null) {
-          _isAiTyping.value = false; 
-          _dispatchMessageToBloc(event.text!, isMe: false);
-        }
-
-        // 2. Handle Stats (Dispatch to Bloc)
-        if (event.vibe != null || event.trust != null || event.tension != null) {
-           context.read<ChatBloc>().add(UpdateAiStats(
-             vibe: event.vibe,
-             trust: event.trust,
-             tension: event.tension,
-           ));
-        }
-
-        // 3. Handle Visual Actions
-        if (event.action != null) {
-          _handleVisualAction(event.action!);
-        }
-      });
-    }
   }
+}
 
   // --- AUDIO LOGIC ---
   Future<void> _initAudio() async {
@@ -199,10 +227,10 @@ class _ChatViewState extends State<_ChatView> with SingleTickerProviderStateMixi
     }
   }
 
-void _handleVisualAction(String actionCode) {
+  void _handleVisualAction(String actionCode) {
     String cleanAction = actionCode.replaceAll("//", "").replaceAll("_", " ");
     
-    // 1. Send Action Message to Bloc (Unchanged)
+    // 1. Send Action Message to Bloc
     final actionMap = {
       "id": "act_${DateTime.now().millisecondsSinceEpoch}_${actionCode.length}", 
       "text": "* $cleanAction *",
@@ -213,42 +241,24 @@ void _handleVisualAction(String actionCode) {
     };
     context.read<ChatBloc>().add(AddAiMessage(actionMap));
 
-    // 2. Trigger Local Animations (UPDATED for new logic)
-    // We only trigger physical SHAKE here. Colors are handled by VisualFxOverlay.
-    if (actionCode.toLowerCase().contains("shake") || 
-        actionCode.toLowerCase().contains("angry") || 
-        actionCode.toLowerCase().contains("slam")) {
+    // 2. Trigger Local Animations (RESTORED YOUR LOGIC)
+    final lowerAction = actionCode.toLowerCase();
+
+    // RESTORED: Your original keywords 'angry' and 'creepy'
+    if (lowerAction.contains("shake") || 
+        lowerAction.contains("angry") || 
+        lowerAction.contains("creepy") || // <--- Added back
+        lowerAction.contains("slam")) {
       _shakeController.forward(from: 0);
     }
     
-    if (actionCode.toLowerCase().contains("leave") || 
-        actionCode.toLowerCase().contains("stand_up")) {
+    // RESTORED: Your original exit logic
+    if (lowerAction.contains("leave") || lowerAction.contains("stand_up")) {
       _showAiExitDialog();
     }
   }
-  // // REPLACED: Instead of setState local list, we dispatch to Bloc
-  // void _handleVisualAction(String actionCode) {
-  //   String cleanAction = actionCode.replaceAll("//", "").replaceAll("_", " ");
-    
-  //   // 1. Send Action Message to Bloc
-  //   final actionMap = {
-  //     "id": "act_${DateTime.now().millisecondsSinceEpoch}_${actionCode.length}", 
-  //     "text": "* $cleanAction *",
-  //     "isMe": false,
-  //     "timestamp": DateTime.now(),
-  //     "isAction": true,
-  //     "isTyped": false, 
-  //   };
-  //   context.read<ChatBloc>().add(AddAiMessage(actionMap));
 
-  //   // 2. Trigger Local Animations
-  //   if (actionCode.contains("angry") || actionCode.contains("creepy")) {
-  //     _shakeController.forward(from: 0);
-  //   }
-  //   if (actionCode.contains("leave") || actionCode.contains("stand_up")) {
-  //     _showAiExitDialog();
-  //   }
-  // }
+
   
   // REPLACED: Instead of setState local list, we dispatch to Bloc
   void _dispatchMessageToBloc(String text, {required bool isMe}) {
@@ -309,10 +319,10 @@ void _handleVisualAction(String actionCode) {
                   buildWhen: (previous, current) => current is AiChatLoaded,
                   builder: (context, state) {
                     if (state is AiChatLoaded) {
+                      // UPDATED: Passing the Map and Room Type
                       return GameStatsBar(
-                        vibe: state.vibe, 
-                        trust: state.trust, 
-                        tension: state.tension, 
+                        roomType: state.roomType,     // Passed from Bloc metadata
+                        currentStats: state.stats,    // Passed directly as Map
                         turnCount: state.turn
                       );
                     }

@@ -17,6 +17,8 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
   // THE FIX: Replaced int counter with DateTime for accurate tracking
   DateTime? _searchStartTime;
 
+  String _currentRoomType = "dating";
+
   MatchBloc(this._repository) : super(MatchInitial()) {
     on<StartMatching>(_onStartMatching);
     on<CheckMatchStatus>(_onCheckMatchStatus);
@@ -26,8 +28,9 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
   Future<void> _onStartMatching(StartMatching event, Emitter<MatchState> emit) async {
     emit(MatchSearching(statusMessage: "Fetching Profile..."));
     
-    // 1. Mark the Start Time
     _searchStartTime = DateTime.now(); 
+    _currentRoomType = event.roomType; 
+    print("MATCH BLOC: Starting Search for $_currentRoomType"); // Debug Log
 
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
@@ -71,14 +74,12 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
                final sessionPath = snapshot.docs.first.reference.path;
                _stopEverything();
                
-               // We trigger the match found state. 
-               // This changes the state from 'MatchSearching' to 'MatchFound',
-               // which automatically breaks the while loop below.
                if (!isClosed) {
                  emit(MatchFound(
                    sessionPath, 
                    isAi: false, 
-                   partnerName: "Stranger"
+                   partnerName: "Stranger",
+                   roomType: _currentRoomType // <--- FIX 2: Pass saved room type
                  )); 
                }
             }
@@ -94,10 +95,9 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
         if (isClosed || state is! MatchSearching) break;
 
         // CALCULATE REAL ELAPSED TIME
-        // This handles app minimization/pausing correctly.
         final int elapsedSeconds = DateTime.now().difference(_searchStartTime!).inSeconds;
 
-        // A. Update UI Status (Updates strictly based on real time)
+        // A. Update UI Status
         if (state is MatchSearching) {
            final currentAttempts = (state as MatchSearching).attemptCount;
            emit(MatchSearching(
@@ -107,7 +107,6 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
         }
 
         // B. PRE-WARM AI (Target: 7s)
-        // Using a range ensures we catch it even if the app lagged past exactly 7s.
         if (elapsedSeconds >= 7 && elapsedSeconds < 13) {
           AiClusterManager().init(); 
         }
@@ -117,7 +116,7 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
           _triggerAiFallback(
             emit, 
             userData, 
-            event.roomType
+            _currentRoomType // <--- FIX 3: Use saved variable
           );
           return; // Exit loop
         }
@@ -140,7 +139,7 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
     }
   }
 
-  void _triggerAiFallback(Emitter<MatchState> emit, Map<String, dynamic> userData, String roomType) {
+void _triggerAiFallback(Emitter<MatchState> emit, Map<String, dynamic> userData, String roomType) {
     _stopEverything();
     
     // 1. Identify who the bot should be
@@ -159,14 +158,14 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
       fakePath,
       isAi: true, 
       partnerName: "Neon",
-      roomType: roomType, 
+      roomType: roomType, // This now comes from _currentRoomType passed in
       aiGender: botGender,
       userGender: userGender,
       userAge: userAge,
     ));
   }
 
-  Future<void> _onCheckMatchStatus(CheckMatchStatus event, Emitter<MatchState> emit) async {
+Future<void> _onCheckMatchStatus(CheckMatchStatus event, Emitter<MatchState> emit) async {
     if (_isProcessing) return; 
     _isProcessing = true; 
 
@@ -178,7 +177,12 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
 
       if (sessionPath != null) {
         _stopEverything();
-        emit(MatchFound(sessionPath, isAi: false));
+        // FIX 4: Pass saved room type here too
+        emit(MatchFound(
+          sessionPath, 
+          isAi: false, 
+          roomType: _currentRoomType
+        ));
       } else {
         final myUid = FirebaseAuth.instance.currentUser?.uid;
         
@@ -191,9 +195,14 @@ class MatchBloc extends Bloc<MatchEvent, MatchState> {
             
         if (activeSessionQuery.docs.isNotEmpty) {
           _stopEverything();
-          emit(MatchFound(activeSessionQuery.docs.first.reference.path, isAi: false));
+          // FIX 5: And here
+          emit(MatchFound(
+            activeSessionQuery.docs.first.reference.path, 
+            isAi: false, 
+            roomType: _currentRoomType
+          ));
         } else {
-           // We do not update attempt count here anymore as the main loop handles UI updates
+           // We do not update attempt count here anymore
         }
       }
     } catch (e) {

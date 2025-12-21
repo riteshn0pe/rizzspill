@@ -3,16 +3,22 @@ import 'dart:async';
 class ActionEvent {
   final String? text;
   final String? action;
+  
+  // STATS (Populated via Smart Lookup)
   final double? vibe;
   final double? trust;
   final double? tension;
+  
+  // NEW: Store the full raw map for safety
+  final Map<String, dynamic>? parameters; 
 
   ActionEvent({
     this.text, 
     this.action, 
     this.vibe, 
     this.trust, 
-    this.tension
+    this.tension,
+    this.parameters, 
   });
 }
 
@@ -27,8 +33,7 @@ class ActionQueueManager {
   
   final List<Timer> _activeTimers = [];
 
-  // --- VOCABULARY LISTS (Scalable & Efficient) ---
-
+  // --- VOCABULARY LISTS (Preserved exactly as you provided) ---
   static const _angerWords = [
   'angry', 'pissed', 'mad', 'furious', 'rage', 'hate', 'hateful', 'fuck you', 'asshole',
   'bitch', 'cunt', 'dickhead', 'idiot', 'stupid', 'dumbass', 'moron', 'fuck off', 'shut up',
@@ -38,9 +43,9 @@ class ActionQueueManager {
   'punch', 'slap', 'hit', 'smack', 'pound', 'smash', 'break', 'throw', 'slam', 'stomp',
   'yell', 'scream', 'shout', 'roar', 'ragequit', 'fuckin hate', 'pissed off', 'loser',
   'trash', 'garbage', 'pathetic', 'weak', 'coward', 'bitchass', 'fuckboy', 'fuckgirl'
-];
+  ];
 
-static const _naughtyWords = [
+  static const _naughtyWords = [
   'fuck', 'fucking', 'fucked', 'dick', 'cock', 'penis', 'pussy', 'cunt', 'clit',
   'ass', 'booty', 'butthole', 'tits', 'boobs', 'breasts', 'nipples', 'cum', 'sperm',
   'jizz', 'blowjob', 'bj', 'handjob', 'hj', '69', 'anal', 'sex', 'sexy', 'horny',
@@ -60,9 +65,9 @@ static const _naughtyWords = [
   'sub', 'master', 'mistress', 'slave', 'collar', 'leash', 'cuck', 'hotwife', 'milf',
   'dilf', 'throat', 'deepthroat', 'gag', 'spit', 'spit roast', 'face fuck', 'face sitting',
   'rimming', 'tongue fuck', 'pussy licking', 'ass licking', 'cumshot', 'facial', 'bukkake'
-];
+  ];
 
-static const _winWords = [
+  static const _winWords = [
   'win', 'won', 'victory', 'victorious', 'winner', 'champion', 'nailed it', 'slay',
   'killed it', 'crushed it', 'dominated', 'owned', 'got it', 'perfect', 'yes', 'yesss',
   'hell yeah', 'fuck yeah', 'boom', 'gotcha', 'touche', 'checkmate', 'bravo', 'epic',
@@ -71,9 +76,9 @@ static const _winWords = [
   'exactly', 'mic drop', 'pog', 'poggers', 'ez', 'easy', 'clapped', 'destroyed',
   'wrecked', 'smoked', 'rolled', 'carried', 'carry', 'carry me', 'gg', 'good game',
   'wp', 'well played', 'ez clap', 'lets go', 'lfg', 'win streak', 'streak'
-];
+  ];
 
-static const _sadWords = [
+  static const _sadWords = [
   'sad', 'depressed', 'cry', 'crying', 'tears', 'heartbroken', 'broken', 'hurt',
   'pain', 'lonely', 'alone', 'empty', 'lost', 'miss you', 'miss her', 'miss him',
   'miss them', 'broken heart', '💔', 'depressing', 'down', 'low', 'suicidal', 'kill myself',
@@ -81,9 +86,9 @@ static const _sadWords = [
   'defeated', 'bad day', 'shit day', 'awful', 'terrible', 'miserable', 'depressing',
   'heartache', 'heart hurt', 'feel bad', 'feel down', 'feel empty', 'feel nothing',
   'tired of life', 'give up', 'done', 'over it', 'goodbye', 'bye forever'
-];
+  ];
 
-static const _loveWords = [
+  static const _loveWords = [
   'love', 'love you', 'i love you', 'ily', 'i love u', 'miss you', 'miss u', 'baby',
   'babe', 'darling', 'honey', 'sweetheart', 'cutie', 'beautiful', 'gorgeous', 'handsome',
   'adorable', 'cute', 'heart', '❤️', 'heart eyes', 'lovely', 'perfect', 'my love',
@@ -93,30 +98,16 @@ static const _loveWords = [
   'soulmate', 'wife', 'husband', 'girlfriend', 'boyfriend', 'gf', 'bf', 'partner',
   'lover', 'date', 'romance', 'romantic', 'sweet', 'sweetie', 'pumpkin', 'angel',
   'princess', 'prince', 'king', 'queen', 'baby girl', 'baby boy', 'my baby'
-];
+  ];
 
-static const _laughWords = [
+  static const _laughWords = [
   'lol', 'lmao', 'lmfao', 'haha', 'hehe', '😂', '🤣', 'funny', 'hilarious', 'rofl',
   'laughing', 'dying', 'dead', 'lololol', 'loll', 'hahaha', 'hehehe', '😂😂', '🤣🤣',
   'laugh', 'giggle', 'chuckle', 'joke', 'joking', 'trolling', 'troll', 'lmao wtf',
   'wtf lol', 'so funny', 'crack up', 'comedy', 'meme', 'memes', 'lit', 'fire', '🔥'
-];
-  // static const _romanceWords = [
-  //   'kiss', 'blush', 'heart', 'love', 'bite', 'hug', 'wink', 'softly', 
-  //   'i am ready', 'awww', 'sweet', 'smiling', 'baby', 'darling' , 'beautiful' , 'fucking amazing'
-  // ];
-  // static const _angerWords = [
-  //   'angry', 'shout', 'hate', 'slap', 'slam', 'yell', 'aggressive', 
-  //   'stomp', 'fuck', 'dick', 'penis', 'pussy', 'slutt', 'idiot', 'shut up'
-  // ];
-  // static const _naughtyWords = [
-  //   'wet', 'shout', 'hate', 'slap', 'slam', 'yell', 'aggressive', 
-  //   'stomp', 'fuck', 'dick', 'penis', 'pussy', 'slutt', 'idiot', 'shut up'
-  // ];
-  // static const _winWords = [
-  //   'agree', 'point', 'win', 'correct', 'nod', 'smart', 'victory', 
-  //   'touche', 'you are right', 'good point' , 'won'
-  // ];
+  ];
+
+  // --- LOGIC (Restored to Original Pacing + Crash Fix) ---
 
   /// Processes the JSON response from AiService
   void processAiResponse(Map<String, dynamic> data) {
@@ -130,19 +121,42 @@ static const _laughWords = [
     Timer(Duration(seconds: typingDelay), () {
       if (_controller.isClosed) return;
 
-      // Emit Text & Stats
+      // --- SMART LOOKUP FOR STATS ---
+      // This ensures that "your_edge" (Debate) or "chaos" (Random) 
+      // are correctly mapped to the 'vibe' slot so ChatScreen receives them.
+      double? getVal(List<String> keys) {
+        for (var key in keys) {
+          if (params.containsKey(key)) {
+            // SAFE CAST: Handle both int and double from JSON
+            return (params[key] as num?)?.toDouble();
+          }
+        }
+        return null;
+      }
+
+      // 1. Primary Stat (Vibe / Chemistry / Your Edge / Chaos)
+      final double? primaryStat = getVal(['vibe', 'chemistry', 'your_edge', 'chaos', 'vulnerability']);
+      
+      // 2. Secondary Stat (Trust / Their Edge / Laugh / Connection)
+      final double? secondaryStat = getVal(['trust', 'their_edge', 'laugh', 'connection']);
+      
+      // 3. Tertiary Stat (Tension / Weirdness / Reciprocity)
+      final double? tertiaryStat = getVal(['tension', 'weirdness', 'reciprocity']);
+
+      // Emit Text & Smart-Mapped Stats
       _controller.add(ActionEvent(
         text: message,
-        vibe: (params['vibe'] as num?)?.toDouble(),
-        trust: (params['trust'] as num?)?.toDouble(),
-        tension: (params['tension'] as num?)?.toDouble(),
+        vibe: primaryStat,
+        trust: secondaryStat,
+        tension: tertiaryStat,
+        parameters: params, 
       ));
 
       // NEW: Analyze the MESSAGE text immediately for visual triggers
-      // (So if AI says "I love you" without an action code, it still glows pink)
       analyzeTextForVisuals(message);
 
       // 3. SCHEDULE ACTIONS (Relative to the text arrival)
+      // We pass the list directly, logic for delay happens inside.
       _scheduleActions(data['actions'] ?? []);
     });
   }
@@ -154,22 +168,27 @@ static const _laughWords = [
     if (text.length < 150) return 3; 
     return 5;                        
   }
-
-  // Helper to schedule the actions list
+// --- HARDCODED DELAY LOGIC ---
   void _scheduleActions(List<dynamic> actionList) {
     int cumulativeDelay = 0; 
 
     for (var actionMap in actionList) {
       final String code = actionMap['code'] ?? "";
       
-      int rawDelay = actionMap['delay'] ?? 0;
-      if (rawDelay < 5 && cumulativeDelay > 0) rawDelay = 10;
-      cumulativeDelay += rawDelay;
+      // --- PREVIOUS AI LOGIC (COMMENTED OUT) ---
+      // We ignore the AI's timing to force the slow pacing you want.
+      // int rawDelay = (actionMap['delay'] as num?)?.toInt() ?? 0;
+      
+      // --- HARDCODED OVERRIDE ---
+      // Force every action to wait exactly 10 seconds after the previous one.
+      int fixedDelay = 10; 
+      
+      cumulativeDelay += fixedDelay;
 
       final timer = Timer(Duration(seconds: cumulativeDelay), () {
         if (!_controller.isClosed) {
           _controller.add(ActionEvent(action: code));
-          // Analyze the ACTION CODE for visual triggers
+          // Analyze the ACTION CODE for visual triggers (e.g. //shake)
           analyzeTextForVisuals(code);
         }
       });
@@ -177,8 +196,37 @@ static const _laughWords = [
     }
   }
 
+  // --- RESTORED SCHEDULE LOGIC (With Crash Fix) ---
+  // void _scheduleActions(List<dynamic> actionList) {
+  //   int cumulativeDelay = 0; 
+
+  //   for (var actionMap in actionList) {
+  //     final String code = actionMap['code'] ?? "";
+      
+  //     // FIX 1: Safely handle Double vs Int (The Crash Fix)
+  //     int rawDelay = (actionMap['delay'] as num?)?.toInt() ?? 0;
+      
+  //     // FIX 2: RESTORED ORIGINAL PACING LOGIC
+  //     // This forces the "slow" behavior you liked. If delay is small (< 5s),
+  //     // it forces a 10s wait. This prevents "all 4 together".
+  //     if (rawDelay < 5 && cumulativeDelay > 0) {
+  //        rawDelay = 10; 
+  //     }
+      
+  //     cumulativeDelay += rawDelay;
+
+  //     final timer = Timer(Duration(seconds: cumulativeDelay), () {
+  //       if (!_controller.isClosed) {
+  //         _controller.add(ActionEvent(action: code));
+  //         // Analyze the ACTION CODE for visual triggers (e.g. //shake)
+  //         analyzeTextForVisuals(code);
+  //       }
+  //     });
+  //     _activeTimers.add(timer);
+  //   }
+  // }
+
   /// PUBLIC API: Call this from ChatScreen when the USER sends a message
-  /// This ensures "Both of Us" trigger effects.
   void analyzeTextForVisuals(String input) {
     if (_visualFxController.isClosed) return;
     
@@ -188,7 +236,7 @@ static const _laughWords = [
     if (_loveWords.any((word) => lowerInput.contains(word))) {
       _visualFxController.add("romance_pulse");
     }
-    // 2. ANGER (
+    // 2. ANGER 
     else if (_angerWords.any((word) => lowerInput.contains(word))) {
       _visualFxController.add("anger_pulse");
     }
@@ -209,7 +257,7 @@ static const _laughWords = [
       _visualFxController.add("win_pulse");
     }
     // 4. EXISTING PHYSICAL ACTIONS (Specific to action codes)
-    else if (lowerInput.contains("shake") || lowerInput.contains("glitch") || lowerInput.contains("creepy")) {
+    else if (lowerInput.contains("shake") || lowerInput.contains("glitch") || lowerInput.contains("creepy") || lowerInput.contains("slam")) {
       _visualFxController.add("shake");
     }
     else if (lowerInput.contains("stare") || lowerInput.contains("silence") || lowerInput.contains("lean")) {
