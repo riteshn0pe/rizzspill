@@ -22,6 +22,12 @@ class UpdateMessages extends ChatEvent {
   UpdateMessages(this.messages);
 }
 
+class RoomStatusChanged extends ChatEvent {
+  final String? status;
+  final String? endedBy;
+  RoomStatusChanged({this.status, this.endedBy});
+}
+
 // --- AI CHAT EVENTS ---
 
 /// UPDATED: Starts a session with specific metadata.

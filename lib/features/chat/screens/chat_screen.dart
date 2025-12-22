@@ -297,45 +297,51 @@ void initState() {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: _resumeAudioOnGesture,
-      child: AnimatedBuilder(
-        animation: _shakeController,
-        builder: (context, child) {
-          final double offset = (0.5 - _shakeController.value).abs() * 20;
-          return Transform.translate(
-            offset: Offset(_shakeController.isAnimating ? offset : 0, 0),
-            child: child,
-          );
-        },
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          appBar: _buildAppBar(context),
-          body: Column(
-            children: [
-              // 1. STATS HUD (Now Connected to Bloc State)
-              if (widget.isAi)
-                BlocBuilder<ChatBloc, ChatState>(
-                  buildWhen: (previous, current) => current is AiChatLoaded,
-                  builder: (context, state) {
-                    if (state is AiChatLoaded) {
-                      // UPDATED: Passing the Map and Room Type
-                      return GameStatsBar(
-                        roomType: state.roomType,     // Passed from Bloc metadata
-                        currentStats: state.stats,    // Passed directly as Map
-                        turnCount: state.turn
-                      );
-                    }
-                    return const SizedBox.shrink(); 
-                  },
-                ),
-              
-              // 2. CHAT AREA
-              Expanded(child: _buildChatArea()),
-              
-              // 3. INPUT
-              _buildInputArea(context),
-            ],
+    return WillPopScope(
+      onWillPop: () async {
+        _showEndChatDialog(context);
+        return false;
+      },
+      child: GestureDetector(
+        onTap: _resumeAudioOnGesture,
+        child: AnimatedBuilder(
+          animation: _shakeController,
+          builder: (context, child) {
+            final double offset = (0.5 - _shakeController.value).abs() * 20;
+            return Transform.translate(
+              offset: Offset(_shakeController.isAnimating ? offset : 0, 0),
+              child: child,
+            );
+          },
+          child: Scaffold(
+            backgroundColor: Colors.black,
+            appBar: _buildAppBar(context),
+            body: Column(
+              children: [
+                // 1. STATS HUD (Now Connected to Bloc State)
+                if (widget.isAi)
+                  BlocBuilder<ChatBloc, ChatState>(
+                    buildWhen: (previous, current) => current is AiChatLoaded,
+                    builder: (context, state) {
+                      if (state is AiChatLoaded) {
+                        // UPDATED: Passing the Map and Room Type
+                        return GameStatsBar(
+                          roomType: state.roomType,     // Passed from Bloc metadata
+                          currentStats: state.stats,    // Passed directly as Map
+                          turnCount: state.turn
+                        );
+                      }
+                      return const SizedBox.shrink(); 
+                    },
+                  ),
+                
+                // 2. CHAT AREA
+                Expanded(child: _buildChatArea()),
+                
+                // 3. INPUT
+                _buildInputArea(context),
+              ],
+            ),
           ),
         ),
       ),

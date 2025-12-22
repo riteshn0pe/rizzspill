@@ -128,6 +128,11 @@ class ChatError extends ChatState {
 
 class ChatEnded extends ChatState {}
 
+class ChatPartnerLeft extends ChatState {
+  final String? endedBy;
+  ChatPartnerLeft({this.endedBy});
+}
+
 // import '../models/chat_message.dart';
 
 // abstract class ChatState {

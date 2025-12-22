@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:hydrated_bloc/hydrated_bloc.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../repository/chat_repository.dart';
 import '../models/chat_message.dart';
 import 'chat_event.dart';
@@ -8,6 +9,8 @@ import 'chat_state.dart';
 class ChatBloc extends HydratedBloc<ChatEvent, ChatState> {
   final ChatRepository _repository;
   StreamSubscription? _messageSubscription;
+  StreamSubscription? _roomSubscription;
+  final String _myUid = FirebaseAuth.instance.currentUser?.uid ?? '';
 
   // --- 1. LOCAL STATE ---
   List<Map<String, dynamic>> _aiMessages = [];
@@ -31,6 +34,7 @@ class ChatBloc extends HydratedBloc<ChatEvent, ChatState> {
     on<UpdateMessages>(_onUpdateMessages);
     on<SendMessage>(_onSendMessage);
     on<EndChat>(_onEndChat);
+    on<RoomStatusChanged>(_onRoomStatusChanged);
     
     // AI Chat Handlers
     on<StartAiSession>(_onStartAiSession);
@@ -130,6 +134,8 @@ Future<void> _onEndChat(EndChat event, Emitter<ChatState> emit) async {
       
       if (success) {
         clear();
+        _messageSubscription?.cancel();
+        _roomSubscription?.cancel();
         emit(ChatEnded());
       } else {
         _isSynced = false;
@@ -138,7 +144,7 @@ Future<void> _onEndChat(EndChat event, Emitter<ChatState> emit) async {
       }
     } else {
       // ... Human logic (unchanged) ...
-      try { await _repository.endChat(event.roomId); clear(); emit(ChatEnded()); } 
+      try { await _repository.endChat(event.roomId); clear(); _messageSubscription?.cancel(); _roomSubscription?.cancel(); emit(ChatEnded()); } 
       catch (e) { emit(ChatError("Failed to end chat: $e")); }
     }
   }
@@ -241,6 +247,12 @@ Future<void> _attemptBackgroundSync() async {
       (messages) => add(UpdateMessages(messages)),
       onError: (error) => print("Stream Error: $error"),
     );
+
+    _roomSubscription?.cancel();
+    _roomSubscription = _repository.watchRoom(event.roomId).listen(
+      (room) => add(RoomStatusChanged(status: room['status'] as String?, endedBy: room['endedBy'] as String?)),
+      onError: (error) => print("Room Stream Error: $error"),
+    );
   }
 
   void _onUpdateMessages(UpdateMessages event, Emitter<ChatState> emit) {
@@ -253,6 +265,21 @@ Future<void> _attemptBackgroundSync() async {
     } catch (e) { 
       print("Send failed: $e"); 
     }
+  }
+
+  void _onRoomStatusChanged(RoomStatusChanged event, Emitter<ChatState> emit) {
+    if (event.status == 'ended' && event.endedBy != _myUid) {
+      _messageSubscription?.cancel();
+      _roomSubscription?.cancel();
+      emit(ChatPartnerLeft(endedBy: event.endedBy));
+    }
+  }
+
+  @override
+  Future<void> close() {
+    _messageSubscription?.cancel();
+    _roomSubscription?.cancel();
+    return super.close();
   }
 }
 

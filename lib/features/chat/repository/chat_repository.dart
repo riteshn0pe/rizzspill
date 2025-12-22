@@ -52,6 +52,17 @@ class ChatRepository {
     });
   }
 
+  // Stream minimal room status so the UI can react when the other user leaves.
+  Stream<Map<String, dynamic>> watchRoom(String chatPath) {
+    return _firestore.doc(chatPath).snapshots().map((doc) {
+      final data = doc.data();
+      return {
+        'status': data?['status'],
+        'endedBy': data?['endedBy'], 
+      };
+    });
+  }
+
   // --- NEW: AI SESSION ARCHIVE (FIXED) ---
 
   Future<bool> archiveAiSession({
